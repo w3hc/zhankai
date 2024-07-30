@@ -2,13 +2,37 @@
 
 Writes the content of all files of a given repo. 
 
-## Install
+## Use
+
+### Install
+
+```bash
+npm install -g zhankai
+```
+
+### Verify
+
+```bash
+zhankai --version
+```
+
+### Run
+
+```bash
+zhankai
+```
+
+A `zhankai_output.md` is created at the root of your repository.
+
+## Contrib
+
+### Install
 
 ```bash
 pnpm i
 ```
 
-## Run
+### Run
 
 ```bash
 pnpm build
