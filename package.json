@@ -1,0 +1,24 @@
+{
+  "name": "zhankai",
+  "version": "1.0.0",
+  "description": "Writes the content of all files of a given repo",
+  "main": "dist/index.js",
+  "bin": {
+    "zhankai": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [],
+  "author": "Julien Béranger",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "commander": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.12",
+    "typescript": "^4.5.2"
+  }
+}
