@@ -15,7 +15,8 @@
   "author": "Julien Béranger",
   "license": "GPL-3.0",
   "dependencies": {
-    "commander": "^8.3.0"
+    "commander": "^8.3.0",
+    "ignore": "^5.3.1"
   },
   "devDependencies": {
     "@types/node": "^16.11.12",
