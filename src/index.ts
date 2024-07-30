@@ -3,6 +3,8 @@
 import fs from "fs/promises";
 import path from "path";
 import { Command } from "commander";
+import { Dirent } from "fs";
+import ignore from "ignore";
 
 interface ZhankaiOptions {
   output: string;
@@ -69,29 +71,48 @@ const getLanguageTag = (filePath: string): string => {
   return langMap[ext] || "";
 };
 
-const excludedItems = ["dist", "node_modules", "pnpm-lock.yaml"];
+const excludedItems = ["LICENSE", ".git"];
+
+const loadGitignorePatterns = async (dir: string): Promise<string[]> => {
+  const gitignorePath = path.join(dir, ".gitignore");
+  try {
+    const gitignoreContent = await fs.readFile(gitignorePath, "utf8");
+    return gitignoreContent
+      .split("\n")
+      .filter((line) => line && !line.startsWith("#"));
+  } catch {
+    return [];
+  }
+};
 
 const traverseDirectory = async (
   dir: string,
   options: ZhankaiOptions,
   currentDepth: number = 0,
-  baseDir: string
+  baseDir: string,
+  ig: ReturnType<typeof ignore>
 ): Promise<void> => {
   if (currentDepth > options.depth) return;
 
-  const files = await fs.readdir(dir);
+  const files = await fs.readdir(dir, { withFileTypes: true });
 
   for (const file of files) {
-    if (excludedItems.includes(file)) continue;
+    const relativePath = path.relative(baseDir, path.join(dir, file.name));
+    if (excludedItems.includes(file.name) || ig.ignores(relativePath)) continue;
 
-    const filePath = path.join(dir, file);
-    const relativePath = path.relative(baseDir, filePath);
+    const filePath = path.join(dir, file.name);
     const stat = await fs.stat(filePath);
 
     if (stat.isDirectory()) {
-      if (!file.startsWith(".")) {
+      if (!file.name.startsWith(".")) {
         await fs.appendFile(options.output, `\n## ${relativePath}\n\n`);
-        await traverseDirectory(filePath, options, currentDepth + 1, baseDir);
+        await traverseDirectory(
+          filePath,
+          options,
+          currentDepth + 1,
+          baseDir,
+          ig
+        );
       }
     } else {
       await processFile(filePath, relativePath, options);
@@ -123,6 +144,43 @@ const getRepoName = async (dir: string): Promise<string> => {
   }
 };
 
+const generateFileStructure = async (
+  dir: string,
+  depth: number,
+  prefix = "",
+  isLast = true,
+  baseDir: string,
+  ig: ReturnType<typeof ignore>
+): Promise<string> => {
+  let treeStructure = "";
+  const files: Dirent[] = await fs.readdir(dir, { withFileTypes: true });
+  const lastIndex = files.length - 1;
+
+  for (const [index, file] of files.entries()) {
+    const relativePath = path.relative(baseDir, path.join(dir, file.name));
+    if (excludedItems.includes(file.name) || ig.ignores(relativePath)) continue;
+
+    const isDirectory = file.isDirectory();
+    const newPrefix = prefix + (isLast ? "    " : "│   ");
+    const connector = index === lastIndex ? "└── " : "├── ";
+
+    treeStructure += `${prefix}${connector}${file.name}\n`;
+
+    if (isDirectory && depth > 0) {
+      treeStructure += await generateFileStructure(
+        path.join(dir, file.name),
+        depth - 1,
+        newPrefix,
+        index === lastIndex,
+        baseDir,
+        ig
+      );
+    }
+  }
+
+  return treeStructure;
+};
+
 const main = async () => {
   const options: ZhankaiOptions = {
     output: program.opts().output,
@@ -136,15 +194,33 @@ const main = async () => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
 
+  const gitignorePatterns = await loadGitignorePatterns(baseDir);
+  const ig = ignore().add(gitignorePatterns);
+
   let content = `# ${repoName}\n`;
   await fs.writeFile(options.output, content);
 
-  await traverseDirectory(baseDir, options, 0, baseDir);
+  await traverseDirectory(baseDir, options, 0, baseDir, ig);
 
-  content = `\n\nGenerated on: ${generateTimestamp()}`;
+  const fileStructure = await generateFileStructure(
+    baseDir,
+    options.depth,
+    "",
+    true,
+    baseDir,
+    ig
+  );
+  await fs.appendFile(
+    options.output,
+    `\n## Structure\n\n\`\`\`\n${fileStructure}\`\`\`\n`
+  );
+
+  content = `\nTimestamp: ${generateTimestamp()}`;
   await fs.appendFile(options.output, content);
 
-  console.log(`Markdown file generated: ${options.output}`);
+  console.log(
+    `\nContent of all files and repo structure written: ${options.output}`
+  );
 };
 
 main().catch(console.error);
