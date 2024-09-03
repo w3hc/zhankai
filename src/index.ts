@@ -205,12 +205,32 @@ const generateFileStructure = async (
   return treeStructure;
 };
 
+const getUniqueFilename = async (baseFilename: string): Promise<string> => {
+  let filename = baseFilename;
+  let counter = 1;
+  while (true) {
+    try {
+      await fs.access(filename);
+      const ext = path.extname(baseFilename);
+      const nameWithoutExt = baseFilename.slice(0, -ext.length);
+      filename = `${nameWithoutExt}(${counter})${ext}`;
+      counter++;
+    } catch {
+      return filename;
+    }
+  }
+};
+
 const main = async () => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
 
+  let baseOutputFilename =
+    program.opts().output || `${repoName}_app_description.md`;
+  const uniqueOutputFilename = await getUniqueFilename(baseOutputFilename);
+
   const options: ZhankaiOptions = {
-    output: program.opts().output || `${repoName}_app_description.md`,
+    output: uniqueOutputFilename,
     depth:
       program.opts().depth === "Infinity"
         ? Infinity
@@ -243,7 +263,7 @@ const main = async () => {
   await fs.appendFile(options.output, content);
 
   console.log(
-    `\nContent of all files and repo structure written in ${repoName}_app_description.md`
+    `\nContent of all files and repo structure written: ${options.output}`
   );
 };
 
