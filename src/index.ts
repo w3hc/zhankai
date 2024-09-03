@@ -16,7 +16,7 @@ const program = new Command();
 
 program
   .version("1.0.0")
-  .option("-o, --output <filename>", "output filename", "zhankai_output.md")
+  .option("-o, --output <filename>", "output filename")
   .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
   .option("-c, --contents", "include file contents", false)
   .parse(process.argv);
@@ -206,17 +206,17 @@ const generateFileStructure = async (
 };
 
 const main = async () => {
+  const baseDir = process.cwd();
+  const repoName = await getRepoName(baseDir);
+
   const options: ZhankaiOptions = {
-    output: program.opts().output,
+    output: program.opts().output || `${repoName}_app_description.md`,
     depth:
       program.opts().depth === "Infinity"
         ? Infinity
         : parseInt(program.opts().depth),
     contents: program.opts().contents,
   };
-
-  const baseDir = process.cwd();
-  const repoName = await getRepoName(baseDir);
 
   const gitignorePatterns = await loadGitignorePatterns(baseDir);
   const ig = ignore().add(gitignorePatterns);
@@ -243,7 +243,7 @@ const main = async () => {
   await fs.appendFile(options.output, content);
 
   console.log(
-    `\nContent of all files and repo structure written: ${options.output}`
+    `\nContent of all files and repo structure written in ${repoName}_app_description.md`
   );
 };
 
