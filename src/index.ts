@@ -71,6 +71,11 @@ const getLanguageTag = (filePath: string): string => {
   return langMap[ext] || "";
 };
 
+const isImageFile = (filePath: string): boolean => {
+  const ext = path.extname(filePath).toLowerCase();
+  return [".png", ".jpg", ".jpeg", ".ico"].includes(ext);
+};
+
 const excludedItems = ["LICENSE", ".git"];
 
 const loadGitignorePatterns = async (dir: string): Promise<string[]> => {
@@ -126,10 +131,29 @@ const processFile = async (
   options: ZhankaiOptions
 ): Promise<void> => {
   const langTag = getLanguageTag(filePath);
+
   await fs.appendFile(options.output, `\n### ${relativePath}\n\n`);
   await fs.appendFile(options.output, "```" + langTag + "\n");
-  const content = await fs.readFile(filePath, "utf8");
-  await fs.appendFile(options.output, content);
+
+  if (isImageFile(filePath)) {
+    await fs.appendFile(options.output, "[This is an image file]");
+  } else {
+    const content = await fs.readFile(filePath, "utf8");
+    const lines = content.split("\n");
+
+    if (lines.length > 500) {
+      const truncatedContent = lines.slice(0, 30).join("\n");
+      await fs.appendFile(options.output, truncatedContent);
+      await fs.appendFile(options.output, "\n```\n");
+      await fs.appendFile(
+        options.output,
+        "\n[This file was cut: it has more than 500 lines]\n"
+      );
+    } else {
+      await fs.appendFile(options.output, content);
+    }
+  }
+
   await fs.appendFile(options.output, "\n```\n");
 };
 
