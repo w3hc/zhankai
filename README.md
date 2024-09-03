@@ -22,7 +22,7 @@ zhankai --version
 zhankai
 ```
 
-A `zhankai_output.md` is created at the root of your repository.
+A `zhankai_output.md` file is created at the root of your repository.
 
 ## Contrib
 
@@ -36,14 +36,14 @@ pnpm i
 
 ```bash
 pnpm build
-npm run install -g .
+npm install -g .
 zhankai
 ```
 
 ## Versions
 
-- pnpm v8.7.5
-- node v20.9.0
+- pnpm `v8.7.5`
+- node `v20.9.0`
 
 ## Support
 

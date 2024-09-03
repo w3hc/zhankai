@@ -7,7 +7,7 @@
     "zhankai": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm install -g . && zhankai",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
