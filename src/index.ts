@@ -6,19 +6,64 @@ import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
 
+class K2000Loader {
+  private position: number = 0;
+  private direction: number = 1;
+  private width: number = 10;
+  private interval: NodeJS.Timeout | null = null;
+  private lastLine: string = "";
+
+  start(): void {
+    if (this.interval) return;
+
+    this.interval = setInterval(() => {
+      process.stdout.write("\r" + " ".repeat(this.lastLine.length) + "\x1b[2A");
+
+      const line =
+        " ".repeat(this.position) +
+        "•" +
+        " ".repeat(this.width - this.position - 1) +
+        "\n\n";
+      this.lastLine = line;
+
+      process.stdout.write("\r" + line);
+
+      this.position += this.direction;
+
+      if (this.position >= this.width - 1) {
+        this.direction = -1;
+      } else if (this.position <= 0) {
+        this.direction = 1;
+      }
+    }, 30);
+  }
+
+  stop(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+      process.stdout.write("\r" + " ".repeat(this.lastLine.length) + "\r\n");
+    }
+  }
+}
+
 interface ZhankaiOptions {
   output: string;
   depth: number;
   contents: boolean;
+  query?: string;
+  debug?: boolean;
 }
 
 const program = new Command();
 
 program
-  .version("1.0.0")
+  .version("1.1.5")
   .option("-o, --output <filename>", "output filename")
   .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
   .option("-c, --contents", "include file contents", false)
+  .option("-q, --query <string>", "query to send to Fatou API")
+  .option("--debug", "enable debug mode")
   .parse(process.argv);
 
 const generateTimestamp = (): string => {
@@ -221,6 +266,61 @@ const getUniqueFilename = async (baseFilename: string): Promise<string> => {
   }
 };
 
+const sendQueryToFatou = async (
+  query: string,
+  filePath: string,
+  debug: boolean
+): Promise<string> => {
+  const FATOU_API_URL = "http://193.108.55.119:3000/ai/ask";
+  const loader = new K2000Loader();
+
+  try {
+    loader.start();
+
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    const formData = new FormData();
+    formData.append("message", query);
+
+    const file = new File([fileContent], path.basename(filePath), {
+      type: "text/markdown",
+    });
+    formData.append("file", file, file.name);
+
+    if (debug) {
+      console.log("File content (first 500 characters):");
+      console.log(fileContent.slice(0, 500));
+      console.log("...");
+    }
+
+    const response = await fetch(FATOU_API_URL, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (debug) {
+      console.log(
+        "API Response Headers:",
+        Object.fromEntries(response.headers.entries())
+      );
+      console.log("API Response Status:", response.status);
+      console.log("API Response Body:", data);
+    }
+
+    loader.stop();
+    return data.answer;
+  } catch (error) {
+    loader.stop();
+    console.error("Error sending query to Fatou API:", error);
+    return "Failed to get response from Fatou API";
+  }
+};
+
 const main = async () => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
@@ -236,12 +336,14 @@ const main = async () => {
         ? Infinity
         : parseInt(program.opts().depth),
     contents: program.opts().contents,
+    query: program.opts().query,
+    debug: program.opts().debug,
   };
 
   const gitignorePatterns = await loadGitignorePatterns(baseDir);
   const ig = ignore().add(gitignorePatterns);
 
-  let content = `# ${repoName}\n`;
+  let content = `# ${repoName}\n\n`;
   await fs.writeFile(options.output, content);
 
   await traverseDirectory(baseDir, options, 0, baseDir, ig);
@@ -265,6 +367,20 @@ const main = async () => {
   console.log(
     `\nContent of all files and repo structure written: ${options.output}`
   );
+
+  if (options.query) {
+    await fs.writeFile(
+      options.output,
+      await fs.readFile(options.output, "utf-8")
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const fatouResponse = await sendQueryToFatou(
+      options.query,
+      options.output,
+      options.debug || false
+    );
+    console.log(fatouResponse);
+  }
 };
 
 main().catch(console.error);
