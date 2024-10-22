@@ -1,6 +1,6 @@
 {
   "name": "zhankai",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Writes the content of all files of a given repo",
   "main": "dist/index.js",
   "bin": {

@@ -44,10 +44,19 @@ This will create a `<REPOSITORY_NAME>_app_description.md` file at the root of yo
 - `-o, --output <filename>`: Specify a custom output filename
 - `-d, --depth <number>`: Set the maximum depth to traverse (default: Infinity)
 - `-c, --contents`: Include file contents (default: false)
+- `-q, --query "your question"` : Ask a question about your codebase (e.g., `zhankai -q "what does this app do?"`)
 
-Example:
+Examples:
+
 ```bash
-zhankai -o custom_output.md -d 2
+# Save output to my-docs.md
+zhankai -o my-docs.md
+
+# Only include files up to 2 directories deep
+zhankai -d 2
+
+# Generate docs and ask about functionality
+zhankai -q "explain the main features"
 ```
 
 ## Features
@@ -57,6 +66,7 @@ zhankai -o custom_output.md -d 2
 - Truncates files with more than 500 lines, showing only the first 30 lines
 - Replaces image file contents (png, jpg, jpeg, ico) with a placeholder message
 - Generates a tree structure of the repository
+- Ask questions about your codebase using the `-q` option (e.g., `zhankai -q "explain this app"`)
 
 ## Contrib
 
@@ -66,12 +76,10 @@ zhankai -o custom_output.md -d 2
 pnpm i
 ```
 
-### Build and Run Locally
+### Build and update
 
 ```bash
 pnpm build
-npm install -g .
-zhankai
 ```
 
 ## Versions
