@@ -3,94 +3,130 @@
 
 # Zhankai
 
-Writes the content of all files of a given repo. You can then use this file to save some time describing your app to your favorite LLM assistant. 
+CLI tool for exporting repository content into a structured markdown file for LLM processing.
 
-## Installation
+## 🚀 Features
 
-You can install Zhankai globally using npm:
+- 📄 Markdown file generation from repository content
+- 🔍 `.gitignore` integration
+- 📊 Repository structure visualization
+- ❓ AI-assisted query system
+- 🔄 File truncation (30 lines preview for 500+ line files)
+- 🖼️ Binary file handling with placeholders
+- 🔐 Authentication system
+
+## 📦 Installation
 
 ```bash
+# Using npm
 npm install -g zhankai
-```
 
-Or using yarn:
-
-```bash
+# Using yarn
 yarn global add zhankai
+
+# Using pnpm
+pnpm add -g zhankai
 ```
 
-## Use
-
-### Verify Installation
-
-After installation, you can verify that Zhankai is installed correctly by checking its version:
+## 🎯 Basic Usage
 
 ```bash
+# Version verification
 zhankai --version
-```
 
-### Run
-
-To use Zhankai, navigate to the root of your repository and run:
-
-```bash
+# Documentation generation
+cd your-project
 zhankai
 ```
 
-This will create a `<REPOSITORY_NAME>_app_description.md` file at the root of your repository, containing the content of all files and the repository structure.
+## 💡 Commands
 
-## Options
-
-- `-o, --output <filename>`: Specify a custom output filename
-- `-d, --depth <number>`: Set the maximum depth to traverse (default: Infinity)
-- `-c, --contents`: Include file contents (default: false)
-- `-q, --query "your question"` : Ask a question about your codebase (e.g., `zhankai -q "what does this app do?"`)
-
-Examples:
+### Documentation Generation
 
 ```bash
-# Save output to my-docs.md
-zhankai -o my-docs.md
+# Default output
+zhankai
 
-# Only include files up to 2 directories deep
+# Custom output file
+zhankai -o custom-docs.md
+
+# Directory depth limitation
 zhankai -d 2
 
-# Generate docs and ask about functionality
-zhankai -q "explain the main features"
+# Include file contents
+zhankai -c
 ```
 
-## Features
+### AI Integration
 
-- Generates a markdown file with the content of all files in the repository
-- Excludes files and directories specified in .gitignore
-- Truncates files with more than 500 lines, showing only the first 30 lines
-- Replaces image file contents (png, jpg, jpeg, ico) with a placeholder message
-- Generates a tree structure of the repository
-- Ask questions about your codebase using the `-q` option (e.g., `zhankai -q "explain this app"`)
-
-## Contrib
-
-### Install Dependencies
+> ⚠️ **Requirement**: [RGCVII](https://basescan.org/token/0x11dC980faf34A1D082Ae8A6a883db3A950a3c6E8) token holdings required.
 
 ```bash
+# Authentication setup
+zhankai setup
+
+# Codebase queries
+zhankai -q "describe functionality"
+
+# Credential removal
+zhankai logout
+```
+
+## 🛠️ Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-o, --output <filename>` | Output file specification | `<REPOSITORY_NAME>_app_description.md` |
+| `-d, --depth <number>` | Directory traversal depth | `Infinity` |
+| `-c, --contents` | Content inclusion flag | `false` |
+| `-q, --query <string>` | AI query string | - |
+| `--version` | Version information | - |
+
+## 🔒 Authentication Process
+
+1. RGCVII token verification
+2. `zhankai setup` execution
+3. Required inputs:
+   - Ethereum address
+   - Etherscan message signature
+   - Signature verification
+
+## 🤝 Development
+
+### Versions
+
+- pnpm v9.12.2
+- Node.js v20.9.0
+
+### Setup
+
+```bash
+git clone https://github.com/your-username/zhankai.git
+cd zhankai
 pnpm i
-```
-
-### Build and update
-
-```bash
 pnpm build
 ```
 
-## Versions
+## 📝 Technical Implementation
 
-- pnpm `v8.7.5`
-- node `v20.9.0`
+1. Repository scanning
+2. `.gitignore` filtering
+3. File processing:
+   - Size-based truncation
+   - Binary file conversion
+   - Format preservation
+4. Structure generation
+5. Markdown compilation
 
-## Support
+## 🆘 Technical Support
 
-You can contact me via [Element](https://matrix.to/#/@julienbrg:matrix.org), [Farcaster](https://warpcast.com/julien-), [Telegram](https://t.me/julienbrg), [Twitter](https://twitter.com/julienbrg), [Discord](https://discordapp.com/users/julienbrg), or [LinkedIn](https://www.linkedin.com/in/julienberanger/).
+- [Element](https://matrix.to/#/@julienbrg:matrix.org)
+- [Farcaster](https://warpcast.com/julien-)
+- [Telegram](https://t.me/julienbrg)
+- [Twitter](https://twitter.com/julienbrg)
+- [Discord](https://discordapp.com/users/julienbrg)
+- [LinkedIn](https://www.linkedin.com/in/julienberanger/)
 
-## License
+## 📄 License
 
-This project is licensed under the GPL-3.0 License.
+GPL-3.0 License. See [LICENSE](LICENSE) for specifications.
