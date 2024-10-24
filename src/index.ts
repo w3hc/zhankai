@@ -5,6 +5,19 @@ import path from "path";
 import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
+import { ethers } from "ethers";
+import prompts from "prompts";
+
+const CONFIG_DIR = path.join(
+  process.env.HOME || process.env.USERPROFILE || ".",
+  ".zhankai"
+);
+const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+
+interface AuthConfig {
+  apiKey: string;
+  walletAddress: string;
+}
 
 class K2000Loader {
   private position: number = 0;
@@ -55,16 +68,66 @@ interface ZhankaiOptions {
   debug?: boolean;
 }
 
-const program = new Command();
+async function setupAuth(): Promise<void> {
+  console.log("Setting up Zhankai authentication...");
 
-program
-  .version("1.1.5")
-  .option("-o, --output <filename>", "output filename")
-  .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
-  .option("-c, --contents", "include file contents", false)
-  .option("-q, --query <string>", "query to send to Fatou API")
-  .option("--debug", "enable debug mode")
-  .parse(process.argv);
+  const { walletAddress } = await prompts({
+    type: "text",
+    name: "walletAddress",
+    message: "Please enter your Ethereum wallet address:",
+    validate: (value) =>
+      ethers.isAddress(value) ? true : "Please enter a valid Ethereum address",
+  });
+
+  const messageResponse = await fetch(
+    "http://localhost:3000/auth/get-message",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress }),
+    }
+  );
+
+  if (!messageResponse.ok) {
+    throw new Error("Failed to get message for signing");
+  }
+
+  const { message } = await messageResponse.json();
+
+  console.log(
+    "\nPlease sign this message using https://etherscan.io/verifiedSignatures"
+  );
+  console.log(`Message to sign: ${message}`);
+
+  const { signature } = await prompts({
+    type: "text",
+    name: "signature",
+    message: "Please paste the Signature Hash from Etherscan:",
+  });
+
+  const verifyResponse = await fetch("http://localhost:3000/auth/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      walletAddress,
+      message,
+      signature,
+    }),
+  });
+
+  if (!verifyResponse.ok) {
+    throw new Error("Failed to verify signature");
+  }
+
+  const { apiKey } = await verifyResponse.json();
+
+  await AuthStore.setAuth({
+    apiKey,
+    walletAddress,
+  });
+
+  console.log("Setup complete! You can now use Zhankai with your API key.");
+}
 
 const generateTimestamp = (): string => {
   const date = new Date();
@@ -271,11 +334,17 @@ const sendQueryToFatou = async (
   filePath: string,
   debug: boolean
 ): Promise<string> => {
-  const FATOU_API_URL = "http://193.108.55.119:3000/ai/ask";
+  const FATOU_API_URL = "http://localhost:3000/ai/ask";
   const loader = new K2000Loader();
 
   try {
     loader.start();
+
+    const auth = await AuthStore.getAuth();
+    if (!auth || !auth.apiKey) {
+      loader.stop();
+      throw new Error("Authentication required. Please run: zhankai setup");
+    }
 
     const fileContent = await fs.readFile(filePath, "utf-8");
     const formData = new FormData();
@@ -290,14 +359,21 @@ const sendQueryToFatou = async (
       console.log("File content (first 500 characters):");
       console.log(fileContent.slice(0, 500));
       console.log("...");
+      console.log("Using API Key:", auth.apiKey);
     }
 
     const response = await fetch(FATOU_API_URL, {
       method: "POST",
+      headers: {
+        "x-api-key": auth.apiKey,
+      },
       body: formData,
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Invalid API key. Please run 'zhankai setup' again.");
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
@@ -321,66 +397,131 @@ const sendQueryToFatou = async (
   }
 };
 
-const main = async () => {
+const AuthStore = {
+  async init() {
+    try {
+      await fs.mkdir(CONFIG_DIR, { recursive: true });
+    } catch (error) {
+      console.error("Error creating config directory:", error);
+    }
+  },
+
+  async getAuth(): Promise<AuthConfig | null> {
+    try {
+      await this.init();
+      const data = await fs.readFile(CONFIG_FILE, "utf8");
+      const auth = JSON.parse(data) as AuthConfig;
+
+      if (!auth || !auth.apiKey || !auth.walletAddress) {
+        return null;
+      }
+
+      return auth;
+    } catch (error) {
+      console.error("Error reading auth config:", error);
+
+      return null;
+    }
+  },
+
+  async setAuth(auth: AuthConfig): Promise<void> {
+    await this.init();
+    const data = JSON.stringify(auth, null, 2);
+    await fs.writeFile(CONFIG_FILE, data, { mode: 0o600 });
+  },
+
+  async clearAuth(): Promise<void> {
+    try {
+      await fs.unlink(CONFIG_FILE);
+    } catch {}
+  },
+};
+
+const program = new Command();
+
+program
+  .version("1.1.5")
+  .option("-o, --output <filename>", "output filename")
+  .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
+  .option("-c, --contents", "include file contents", false)
+  .option("-q, --query <string>", "query to send to Fatou API")
+  .option("--debug", "enable debug mode");
+
+program
+  .command("setup")
+  .description("Setup authentication for Zhankai")
+  .action(setupAuth);
+
+program
+  .command("logout")
+  .description("Clear stored credentials")
+  .action(async () => {
+    await AuthStore.clearAuth();
+    console.log("Credentials cleared successfully");
+  });
+
+program.action(async (options) => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
 
-  let baseOutputFilename =
-    program.opts().output || `${repoName}_app_description.md`;
+  let baseOutputFilename = options.output || `${repoName}_app_description.md`;
   const uniqueOutputFilename = await getUniqueFilename(baseOutputFilename);
 
-  const options: ZhankaiOptions = {
+  const zhankaiOptions: ZhankaiOptions = {
     output: uniqueOutputFilename,
-    depth:
-      program.opts().depth === "Infinity"
-        ? Infinity
-        : parseInt(program.opts().depth),
-    contents: program.opts().contents,
-    query: program.opts().query,
-    debug: program.opts().debug,
+    depth: options.depth === "Infinity" ? Infinity : parseInt(options.depth),
+    contents: options.contents,
+    query: options.query,
+    debug: options.debug,
   };
 
   const gitignorePatterns = await loadGitignorePatterns(baseDir);
   const ig = ignore().add(gitignorePatterns);
 
   let content = `# ${repoName}\n\n`;
-  await fs.writeFile(options.output, content);
+  await fs.writeFile(zhankaiOptions.output, content);
 
-  await traverseDirectory(baseDir, options, 0, baseDir, ig);
+  await traverseDirectory(baseDir, zhankaiOptions, 0, baseDir, ig);
 
   const fileStructure = await generateFileStructure(
     baseDir,
-    options.depth,
+    zhankaiOptions.depth,
     "",
     true,
     baseDir,
     ig
   );
   await fs.appendFile(
-    options.output,
+    zhankaiOptions.output,
     `\n## Structure\n\n\`\`\`\n${fileStructure}\`\`\`\n`
   );
 
   content = `\nTimestamp: ${generateTimestamp()}`;
-  await fs.appendFile(options.output, content);
+  await fs.appendFile(zhankaiOptions.output, content);
 
   console.log(
-    `\nContent of all files and repo structure written: ${options.output}`
+    `\nContent of all files and repo structure written: ${zhankaiOptions.output}`
   );
 
-  if (options.query) {
+  if (zhankaiOptions.query) {
+    const auth = await AuthStore.getAuth();
+    if (!auth) {
+      console.error("Authentication required. Please run: zhankai setup");
+      process.exit(1);
+    }
+
     await fs.writeFile(
-      options.output,
-      await fs.readFile(options.output, "utf-8")
+      zhankaiOptions.output,
+      await fs.readFile(zhankaiOptions.output, "utf-8")
     );
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const fatouResponse = await sendQueryToFatou(
-      options.query,
-      options.output,
-      options.debug || false
+      zhankaiOptions.query,
+      zhankaiOptions.output,
+      zhankaiOptions.debug || false
     );
     console.log(fatouResponse);
   }
-};
+});
 
-main().catch(console.error);
+program.parse(process.argv);
