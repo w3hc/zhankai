@@ -80,7 +80,9 @@ async function setupAuth(): Promise<void> {
   });
 
   const messageResponse = await fetch(
-    "http://localhost:3000/auth/get-message",
+    // "http://localhost:3000/auth/get-message",
+
+    "http://193.108.55.119:3000/auth/get-message",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -95,7 +97,7 @@ async function setupAuth(): Promise<void> {
   const { message } = await messageResponse.json();
 
   console.log(
-    "\nPlease sign this message using https://etherscan.io/verifiedSignatures"
+    "\nPlease sign this message using https://etherscan.io/verifiedSignatures (click 'Sign Message' at the top right)"
   );
   console.log(`Message to sign: ${message}`);
 
@@ -105,7 +107,8 @@ async function setupAuth(): Promise<void> {
     message: "Please paste the Signature Hash from Etherscan:",
   });
 
-  const verifyResponse = await fetch("http://localhost:3000/auth/verify", {
+  // const verifyResponse = await fetch("http://localhost:3000/auth/verify", {
+  const verifyResponse = await fetch("http://193.108.55.119:3000/auth/verify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -334,7 +337,8 @@ const sendQueryToFatou = async (
   filePath: string,
   debug: boolean
 ): Promise<string> => {
-  const FATOU_API_URL = "http://localhost:3000/ai/ask";
+  // const FATOU_API_URL = "http://localhost:3000/ai/ask";
+  const FATOU_API_URL = "http://193.108.55.119:3000/ai/ask";
   const loader = new K2000Loader();
 
   try {
