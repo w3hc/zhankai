@@ -1,9 +1,9 @@
-# Zhankai
-
-Writes the content of all files of a given repo. 
-
 [![npm version](https://img.shields.io/npm/v/zhankai.svg)](https://www.npmjs.com/package/zhankai)
 [![npm downloads](https://img.shields.io/npm/dm/zhankai.svg)](https://www.npmjs.com/package/zhankai)
+
+# Zhankai
+
+Writes the content of all files of a given repo. You can then use this file to save some time describing your app to your favorite LLM assistant. 
 
 ## Installation
 
