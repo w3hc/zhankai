@@ -441,6 +441,29 @@ const AuthStore = {
   },
 };
 
+async function addToGitignore(pattern: string): Promise<void> {
+  try {
+    const gitignorePath = path.join(process.cwd(), ".gitignore");
+
+    let currentContent = "";
+    try {
+      currentContent = await fs.readFile(gitignorePath, "utf8");
+    } catch (error) {}
+
+    if (!currentContent.split("\n").some((line) => line.trim() === pattern)) {
+      const newContent =
+        currentContent && !currentContent.endsWith("\n")
+          ? `${currentContent}\n${pattern}\n`
+          : `${currentContent}${pattern}\n`;
+
+      await fs.writeFile(gitignorePath, newContent, "utf8");
+      console.log(`Added /zhankai to .gitignore`);
+    }
+  } catch (error) {
+    console.error("Error updating .gitignore:", error);
+  }
+}
+
 const program = new Command();
 
 program
@@ -468,8 +491,40 @@ program.action(async (options) => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
 
+  const zhankaiDir = path.join(baseDir, "zhankai");
+  try {
+    await fs.mkdir(zhankaiDir, { recursive: true });
+
+    try {
+      const stats = await fs.stat(zhankaiDir);
+      const now = new Date();
+      const dirCreationTime = new Date(stats.birthtime);
+
+      if (now.getTime() - dirCreationTime.getTime() > 5000) {
+        console.log(`Using existing zhankai directory: ${zhankaiDir}`);
+      } else {
+        console.log(`\nCreated zhankai directory: ${zhankaiDir}`);
+      }
+    } catch {
+      console.log(`\nCreated zhankai directory: ${zhankaiDir}`);
+    }
+  } catch (error) {
+    console.error("Error accessing zhankai directory:", error);
+  }
+
+  const gitignorePath = path.join(baseDir, ".gitignore");
+  try {
+    await fs.access(gitignorePath);
+    await addToGitignore("/zhankai");
+  } catch {
+    console.log(
+      "No .gitignore file found. Skipping addition of /zhankai to .gitignore."
+    );
+  }
+
   let baseOutputFilename = options.output || `${repoName}_app_description.md`;
-  const uniqueOutputFilename = await getUniqueFilename(baseOutputFilename);
+  const outputPath = path.join(zhankaiDir, baseOutputFilename);
+  const uniqueOutputFilename = await getUniqueFilename(outputPath);
 
   const zhankaiOptions: ZhankaiOptions = {
     output: uniqueOutputFilename,
