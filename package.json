@@ -6,6 +6,10 @@
   "bin": {
     "zhankai": "./dist/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/w3hc/zhankai.git"
+  },
   "scripts": {
     "build": "tsc && npm install -g . && zhankai",
     "start": "node dist/index.js",
