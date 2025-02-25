@@ -71,13 +71,15 @@ zhankai -q "Describe this app"
 
 By default, Zhankai:
 
-- Creates a dedicated /zhankai directory in your project
+- Creates a dedicated `/zhankai` directory in your project
 - Places all generated files inside this directory
-- Automatically adds /zhankai to your .gitignore file (if one exists)
+- Automatically adds `/zhankai` to your .gitignore file (if one exists)
 
 This helps keep your project root clean and prevents version control systems from tracking generated files.
 
 ## Development
+
+Feel free to reach out and contribute to this project. Please read the [contribution guidelines](CONTRIBUTING.md) before submitting pull requests.
 
 ### Versions
 
@@ -104,6 +106,6 @@ Feel free to reach out to [Julien](https://github.com/julienbrg) through:
 - Discord: [julienbrg](https://discordapp.com/users/julienbrg)
 - LinkedIn: [julienberanger](https://www.linkedin.com/in/julienberanger/)
 
-## 📄 License
+## License
 
 GPL-3.0 License. See [LICENSE](LICENSE) for specifications.
