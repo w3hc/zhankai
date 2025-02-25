@@ -15,7 +15,18 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "llm",
+    "mistral",
+    "claude",
+    "chatgpt",
+    "typescript",
+    "npm",
+    "package",
+    "cli",
+    "tool"
+  ],
   "author": "Julien Béranger",
   "license": "GPL-3.0",
   "dependencies": {
