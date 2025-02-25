@@ -1,10 +1,14 @@
 {
   "name": "zhankai",
-  "version": "1.2.1",
+  "version": "1.4.0",
   "description": "Writes the content of all files of a given repo",
   "main": "dist/index.js",
   "bin": {
     "zhankai": "./dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/w3hc/zhankai.git"
   },
   "scripts": {
     "build": "tsc && npm install -g . && zhankai",

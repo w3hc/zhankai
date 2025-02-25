@@ -5,19 +5,6 @@ import path from "path";
 import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
-import { ethers } from "ethers";
-import prompts from "prompts";
-
-const CONFIG_DIR = path.join(
-  process.env.HOME || process.env.USERPROFILE || ".",
-  ".zhankai"
-);
-const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
-
-interface AuthConfig {
-  apiKey: string;
-  walletAddress: string;
-}
 
 class K2000Loader {
   private position: number = 0;
@@ -66,70 +53,6 @@ interface ZhankaiOptions {
   contents: boolean;
   query?: string;
   debug?: boolean;
-}
-
-async function setupAuth(): Promise<void> {
-  console.log("Setting up Zhankai authentication...");
-
-  const { walletAddress } = await prompts({
-    type: "text",
-    name: "walletAddress",
-    message: "Please enter your Ethereum wallet address:",
-    validate: (value) =>
-      ethers.isAddress(value) ? true : "Please enter a valid Ethereum address",
-  });
-
-  const messageResponse = await fetch(
-    // "http://localhost:3000/auth/get-message",
-
-    "http://193.108.55.119:3000/auth/get-message",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ walletAddress }),
-    }
-  );
-
-  if (!messageResponse.ok) {
-    throw new Error("Failed to get message for signing");
-  }
-
-  const { message } = await messageResponse.json();
-
-  console.log(
-    "\nPlease sign this message using https://etherscan.io/verifiedSignatures (click 'Sign Message' at the top right)"
-  );
-  console.log(`Message to sign: ${message}`);
-
-  const { signature } = await prompts({
-    type: "text",
-    name: "signature",
-    message: "Please paste the Signature Hash from Etherscan:",
-  });
-
-  // const verifyResponse = await fetch("http://localhost:3000/auth/verify", {
-  const verifyResponse = await fetch("http://193.108.55.119:3000/auth/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      walletAddress,
-      message,
-      signature,
-    }),
-  });
-
-  if (!verifyResponse.ok) {
-    throw new Error("Failed to verify signature");
-  }
-
-  const { apiKey } = await verifyResponse.json();
-
-  await AuthStore.setAuth({
-    apiKey,
-    walletAddress,
-  });
-
-  console.log("Setup complete! You can now use Zhankai with your API key.");
 }
 
 const generateTimestamp = (): string => {
@@ -332,114 +255,234 @@ const getUniqueFilename = async (baseFilename: string): Promise<string> => {
   }
 };
 
-const sendQueryToFatou = async (
+const formatMarkdownForTerminal = (markdown: string): string => {
+  const BOLD = "\x1b[1m";
+  const BLUE = "\x1b[34m";
+  const GREEN = "\x1b[32m";
+  const CYAN = "\x1b[36m";
+  const YELLOW = "\x1b[33m";
+  const RESET = "\x1b[0m";
+
+  let formatted = markdown
+    .replace(/^# (.*$)/gm, `${BOLD}${BLUE}$1${RESET}`)
+    .replace(/^## (.*$)/gm, `${BOLD}${GREEN}$1${RESET}`)
+    .replace(/^### (.*$)/gm, `${BOLD}${CYAN}$1${RESET}`)
+    .replace(/^#### (.*$)/gm, `${BOLD}${YELLOW}$1${RESET}`);
+
+  formatted = formatted.replace(
+    /```[a-z]*\n([\s\S]*?)```/g,
+    (_, code) =>
+      `\n${code
+        .split("\n")
+        .map((line: string) => `    ${line}`)
+        .join("\n")}\n`
+  );
+
+  formatted = formatted.replace(/^- (.*$)/gm, `  • $1`);
+
+  formatted = formatted.replace(/^[0-9]+\. (.*$)/gm, (match, content) => {
+    const number = match.split(".")[0];
+    return `  ${number}. ${content}`;
+  });
+
+  formatted = formatted.replace(/\|(.*)\|/g, (match) => {
+    if (match.includes("-----")) {
+      return "  " + "-".repeat(60);
+    }
+
+    const cells = match
+      .split("|")
+      .filter((cell) => cell.trim() !== "")
+      .map((cell) => cell.trim());
+
+    if (cells.length >= 2) {
+      return `  ${cells[0]}: ${cells.slice(1).join(" | ")}`;
+    }
+    return match;
+  });
+
+  return "\n" + formatted + "\n";
+};
+
+const sendQueryToRukh = async (
   query: string,
   filePath: string,
   debug: boolean
 ): Promise<string> => {
-  // const FATOU_API_URL = "http://localhost:3000/ai/ask";
-  const FATOU_API_URL = "http://193.108.55.119:3000/ai/ask";
+  const RUKH_API_URL = "https://rukh.w3hc.org/ask";
   const loader = new K2000Loader();
 
   try {
+    console.log("\nSending query to Rukh API...");
+    console.log(`Query: "${query}"`);
+    console.log(`File: ${filePath}`);
+
     loader.start();
 
-    const auth = await AuthStore.getAuth();
-    if (!auth || !auth.apiKey) {
-      loader.stop();
-      throw new Error("Authentication required. Please run: zhankai setup");
+    try {
+      await fs.access(filePath);
+      console.log("✓ File exists and is accessible");
+    } catch (error) {
+      console.error("✗ Error accessing file:", error);
+      throw new Error(`Cannot access file at path: ${filePath}`);
     }
 
     const fileContent = await fs.readFile(filePath, "utf-8");
+    console.log(`✓ File read successfully (${fileContent.length} bytes)`);
+
     const formData = new FormData();
+
     formData.append("message", query);
+    formData.append("model", "");
+    formData.append("sessionId", "");
+    formData.append("walletAddress", "");
+    formData.append("context", "");
 
-    const file = new File([fileContent], path.basename(filePath), {
-      type: "text/markdown",
-    });
-    formData.append("file", file, file.name);
+    const fileName = path.basename(filePath);
 
-    if (debug) {
-      console.log("File content (first 500 characters):");
-      console.log(fileContent.slice(0, 500));
-      console.log("...");
-      console.log("Using API Key:", auth.apiKey);
+    if (typeof File === "undefined") {
+      console.log(
+        "Running in Node.js environment - using Blob for file upload"
+      );
+      const blob = new Blob([fileContent], { type: "text/markdown" });
+      formData.append("file", blob, fileName);
+    } else {
+      console.log("Running in browser environment - using File API");
+      const file = new File([fileContent], fileName, {
+        type: "text/markdown",
+      });
+      formData.append("file", file);
     }
 
-    const response = await fetch(FATOU_API_URL, {
+    console.log("✓ FormData created with all required fields and file");
+    console.log(`→ Sending request to ${RUKH_API_URL}`);
+
+    console.log("Request details:");
+    console.log("- Method: POST");
+    console.log(`- File name: ${fileName}`);
+    console.log(`- File size: ${fileContent.length} bytes`);
+    console.log(
+      "- Fields included: message, model, sessionId, walletAddress, context, file"
+    );
+
+    if (debug) {
+      console.log("\nDEBUG - File content (first 500 characters):");
+      console.log(fileContent.slice(0, 500));
+      console.log("...");
+    }
+
+    const response = await fetch(RUKH_API_URL, {
       method: "POST",
       headers: {
-        "x-api-key": auth.apiKey,
+        accept: "application/json",
       },
       body: formData,
     });
 
+    console.log(
+      `← Received response with status: ${response.status} ${response.statusText}`
+    );
+
     if (!response.ok) {
+      console.error(
+        `✗ Error response: ${response.status} ${response.statusText}`
+      );
+
+      let errorDetails = "";
+      try {
+        const errorData = await response.text();
+        errorDetails = errorData;
+        console.error("Error details:", errorDetails);
+      } catch (e) {
+        console.error("Could not parse error response");
+      }
+
       if (response.status === 401) {
         throw new Error("Invalid API key. Please run 'zhankai setup' again.");
       }
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (debug) {
-      console.log(
-        "API Response Headers:",
-        Object.fromEntries(response.headers.entries())
+      throw new Error(
+        `HTTP error! status: ${response.status}, details: ${errorDetails}`
       );
-      console.log("API Response Status:", response.status);
-      console.log("API Response Body:", data);
     }
+
+    console.log("✓ Received successful response");
+
+    const responseBody = await response.text();
+    console.log(`✓ Response body received (${responseBody.length} bytes)`);
+
+    let data;
+    try {
+      data = JSON.parse(responseBody);
+      console.log("✓ Response JSON parsed successfully");
+    } catch (e) {
+      console.error("✗ Failed to parse JSON response:", e);
+      console.log("Raw response:", responseBody);
+      throw new Error("Failed to parse API response as JSON");
+    }
+
+    if (debug || !(data.answer || data.output)) {
+      console.log("\nResponse details:");
+      console.log("- Headers:", Object.fromEntries(response.headers.entries()));
+      console.log("- Full response body:", data);
+    }
+
+    const responseContent = data.answer || data.output;
+
+    if (!responseContent) {
+      console.error("✗ No answer or output field found in response");
+      console.log("Response structure:", Object.keys(data));
+      throw new Error("Missing answer/output field in API response");
+    }
+
+    console.log("✓ Response text extracted from response");
+
+    const baseDir = process.cwd();
+    const zhankaiDir = path.join(baseDir, "zhankai");
+
+    const baseQueryFilename = "query.md";
+    const queryFilePath = path.join(zhankaiDir, baseQueryFilename);
+
+    const uniqueQueryFilename = await getUniqueFilename(queryFilePath);
+
+    await fs.writeFile(uniqueQueryFilename, responseContent, "utf-8");
+    console.log(`✓ Response saved to file: ${uniqueQueryFilename}`);
+
+    const formattedResponse = formatMarkdownForTerminal(responseContent);
 
     loader.stop();
-    return data.answer;
+    return formattedResponse;
   } catch (error) {
     loader.stop();
-    console.error("Error sending query to Fatou API:", error);
-    return "Failed to get response from Fatou API";
+    console.error("\n✗ Error sending query to Rukh API:", error);
+    if (error instanceof Error) {
+      return `Failed to get response from Rukh API: ${error.message}`;
+    }
+    return "Failed to get response from Rukh API";
   }
 };
 
-const AuthStore = {
-  async init() {
+async function addToGitignore(pattern: string): Promise<void> {
+  try {
+    const gitignorePath = path.join(process.cwd(), ".gitignore");
+
+    let currentContent = "";
     try {
-      await fs.mkdir(CONFIG_DIR, { recursive: true });
-    } catch (error) {
-      console.error("Error creating config directory:", error);
+      currentContent = await fs.readFile(gitignorePath, "utf8");
+    } catch (error) {}
+
+    if (!currentContent.split("\n").some((line) => line.trim() === pattern)) {
+      const newContent =
+        currentContent && !currentContent.endsWith("\n")
+          ? `${currentContent}\n${pattern}\n`
+          : `${currentContent}${pattern}\n`;
+
+      await fs.writeFile(gitignorePath, newContent, "utf8");
+      console.log(`Added /zhankai to .gitignore`);
     }
-  },
-
-  async getAuth(): Promise<AuthConfig | null> {
-    try {
-      await this.init();
-      const data = await fs.readFile(CONFIG_FILE, "utf8");
-      const auth = JSON.parse(data) as AuthConfig;
-
-      if (!auth || !auth.apiKey || !auth.walletAddress) {
-        return null;
-      }
-
-      return auth;
-    } catch (error) {
-      console.error("Error reading auth config:", error);
-
-      return null;
-    }
-  },
-
-  async setAuth(auth: AuthConfig): Promise<void> {
-    await this.init();
-    const data = JSON.stringify(auth, null, 2);
-    await fs.writeFile(CONFIG_FILE, data, { mode: 0o600 });
-  },
-
-  async clearAuth(): Promise<void> {
-    try {
-      await fs.unlink(CONFIG_FILE);
-    } catch {}
-  },
-};
+  } catch (error) {
+    console.error("Error updating .gitignore:", error);
+  }
+}
 
 const program = new Command();
 
@@ -448,28 +491,47 @@ program
   .option("-o, --output <filename>", "output filename")
   .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
   .option("-c, --contents", "include file contents", false)
-  .option("-q, --query <string>", "query to send to Fatou API")
+  .option("-q, --query <string>", "query to send to Rukh API")
   .option("--debug", "enable debug mode");
-
-program
-  .command("setup")
-  .description("Setup authentication for Zhankai")
-  .action(setupAuth);
-
-program
-  .command("logout")
-  .description("Clear stored credentials")
-  .action(async () => {
-    await AuthStore.clearAuth();
-    console.log("Credentials cleared successfully");
-  });
 
 program.action(async (options) => {
   const baseDir = process.cwd();
   const repoName = await getRepoName(baseDir);
 
+  const zhankaiDir = path.join(baseDir, "zhankai");
+  try {
+    await fs.mkdir(zhankaiDir, { recursive: true });
+
+    try {
+      const stats = await fs.stat(zhankaiDir);
+      const now = new Date();
+      const dirCreationTime = new Date(stats.birthtime);
+
+      if (now.getTime() - dirCreationTime.getTime() > 5000) {
+        console.log(`\nUsing existing zhankai directory: ${zhankaiDir}`);
+      } else {
+        console.log(`\nCreated zhankai directory: ${zhankaiDir}`);
+      }
+    } catch {
+      console.log(`\nCreated zhankai directory: ${zhankaiDir}`);
+    }
+  } catch (error) {
+    console.error("Error accessing zhankai directory:", error);
+  }
+
+  const gitignorePath = path.join(baseDir, ".gitignore");
+  try {
+    await fs.access(gitignorePath);
+    await addToGitignore("/zhankai");
+  } catch {
+    console.log(
+      "No .gitignore file found. Skipping addition of /zhankai to .gitignore."
+    );
+  }
+
   let baseOutputFilename = options.output || `${repoName}_app_description.md`;
-  const uniqueOutputFilename = await getUniqueFilename(baseOutputFilename);
+  const outputPath = path.join(zhankaiDir, baseOutputFilename);
+  const uniqueOutputFilename = await getUniqueFilename(outputPath);
 
   const zhankaiOptions: ZhankaiOptions = {
     output: uniqueOutputFilename,
@@ -508,23 +570,17 @@ program.action(async (options) => {
   );
 
   if (zhankaiOptions.query) {
-    const auth = await AuthStore.getAuth();
-    if (!auth) {
-      console.error("Authentication required. Please run: zhankai setup");
-      process.exit(1);
-    }
-
     await fs.writeFile(
       zhankaiOptions.output,
       await fs.readFile(zhankaiOptions.output, "utf-8")
     );
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const fatouResponse = await sendQueryToFatou(
+    const rukhResponse = await sendQueryToRukh(
       zhankaiOptions.query,
       zhankaiOptions.output,
       zhankaiOptions.debug || false
     );
-    console.log(fatouResponse);
+    console.log(rukhResponse);
   }
 });
 

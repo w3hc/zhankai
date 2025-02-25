@@ -5,7 +5,7 @@
 
 CLI tool for exporting repository content into a structured markdown file for LLM processing.
 
-## 🚀 Features
+## Features
 
 - 📄 Markdown file generation from repository content
 - 🔍 `.gitignore` integration
@@ -13,9 +13,10 @@ CLI tool for exporting repository content into a structured markdown file for LL
 - ❓ AI-assisted query system
 - 🔄 File truncation (30 lines preview for 500+ line files)
 - 🖼️ Binary file handling with placeholders
-- 🔐 Authentication system
+- 📁 Automatic output organization in a dedicated folder
+- 🙈 Automatic .gitignore management
 
-## 📦 Installation
+## Installation
 
 ```bash
 # Using npm
@@ -28,18 +29,14 @@ yarn global add zhankai
 pnpm add -g zhankai
 ```
 
-## 🎯 Basic Usage
+## Basic Usage
 
 ```bash
-# Version verification
-zhankai --version
-
-# Documentation generation
 cd your-project
 zhankai
 ```
 
-## 💡 Commands
+## Commands
 
 ### Documentation Generation
 
@@ -55,24 +52,12 @@ zhankai -d 2
 
 # Include file contents
 zhankai -c
+
+# Query Rukh API (https://github.com/w3hc/rukh)
+zhankai -q "Describe this app"
 ```
 
-### AI Integration
-
-> ⚠️ **Requirement**: [RGCVII](https://basescan.org/token/0x11dC980faf34A1D082Ae8A6a883db3A950a3c6E8) token holdings required.
-
-```bash
-# Authentication setup
-zhankai setup
-
-# Codebase queries
-zhankai -q "describe functionality"
-
-# Credential removal
-zhankai logout
-```
-
-## 🛠️ Options
+## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
@@ -82,50 +67,42 @@ zhankai logout
 | `-q, --query <string>` | AI query string | - |
 | `--version` | Version information | - |
 
-## 🔒 Authentication Process
+## Output Organization
 
-1. RGCVII token verification
-2. `zhankai setup` execution
-3. Required inputs:
-   - Ethereum address
-   - Etherscan message signature
-   - Signature verification
+By default, Zhankai:
 
-## 🤝 Development
+- Creates a dedicated /zhankai directory in your project
+- Places all generated files inside this directory
+- Automatically adds /zhankai to your .gitignore file (if one exists)
+
+This helps keep your project root clean and prevents version control systems from tracking generated files.
+
+## Development
 
 ### Versions
 
-- pnpm v9.12.2
-- Node.js v20.9.0
+- pnpm `v9.15.4`
+- Node.js `v23.7.0`
 
 ### Setup
 
 ```bash
-git clone https://github.com/your-username/zhankai.git
+git clone https://github.com/w3hc/zhankai.git
 cd zhankai
 pnpm i
 pnpm build
 ```
 
-## 📝 Technical Implementation
+## Support
 
-1. Repository scanning
-2. `.gitignore` filtering
-3. File processing:
-   - Size-based truncation
-   - Binary file conversion
-   - Format preservation
-4. Structure generation
-5. Markdown compilation
+Feel free to reach out to [Julien](https://github.com/julienbrg) through:
 
-## 🆘 Technical Support
-
-- [Element](https://matrix.to/#/@julienbrg:matrix.org)
-- [Farcaster](https://warpcast.com/julien-)
-- [Telegram](https://t.me/julienbrg)
-- [Twitter](https://twitter.com/julienbrg)
-- [Discord](https://discordapp.com/users/julienbrg)
-- [LinkedIn](https://www.linkedin.com/in/julienberanger/)
+- Element: [@julienbrg:matrix.org](https://matrix.to/#/@julienbrg:matrix.org)
+- Farcaster: [julien-](https://warpcast.com/julien-)
+- Telegram: [@julienbrg](https://t.me/julienbrg)
+- Twitter: [@julienbrg](https://twitter.com/julienbrg)
+- Discord: [julienbrg](https://discordapp.com/users/julienbrg)
+- LinkedIn: [julienberanger](https://www.linkedin.com/in/julienberanger/)
 
 ## 📄 License
 
