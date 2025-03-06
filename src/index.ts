@@ -319,8 +319,8 @@ const sendQueryToRukh = async (
   debug: boolean
 ): Promise<string> => {
   // Define constants
-  // const RUKH_API_URL = "https://rukh.w3hc.org/ask"; // Production URL
-  const RUKH_API_URL = "http://localhost:3000/ask"; // Local development URL
+  const RUKH_API_URL = "https://rukh.w3hc.org/ask"; // Production URL
+  // const RUKH_API_URL = "http://localhost:3000/ask"; // Local development URL
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000; // 2 seconds
 
