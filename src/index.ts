@@ -5,6 +5,7 @@ import path from "path";
 import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
+import { writeFileSync, existsSync, mkdirSync } from "fs";
 
 class K2000Loader {
   private position: number = 0;
@@ -309,7 +310,8 @@ const sendQueryToRukh = async (
   filePath: string,
   debug: boolean
 ): Promise<string> => {
-  const RUKH_API_URL = "https://rukh.w3hc.org/ask";
+  // const RUKH_API_URL = "https://rukh.w3hc.org/ask";
+  const RUKH_API_URL = "http://localhost:3000/ask";
   const loader = new K2000Loader();
 
   try {
@@ -333,10 +335,10 @@ const sendQueryToRukh = async (
     const formData = new FormData();
 
     formData.append("message", query);
-    formData.append("model", "");
+    formData.append("model", "anthropic");
     formData.append("sessionId", "");
     formData.append("walletAddress", "");
-    formData.append("context", "");
+    formData.append("context", "zhankai");
 
     const fileName = path.basename(filePath);
 
@@ -362,7 +364,7 @@ const sendQueryToRukh = async (
     console.log(`- File name: ${fileName}`);
     console.log(`- File size: ${fileContent.length} bytes`);
     console.log(
-      "- Fields included: message, model, sessionId, walletAddress, context, file"
+      "- Fields included: message, model, sessionId, walletAddress, context (zhankai), file"
     );
 
     if (debug) {
@@ -484,6 +486,81 @@ async function addToGitignore(pattern: string): Promise<void> {
   }
 }
 
+/**
+ * Processes the mock-output.json file and creates the specified files
+ * @returns {Promise<void>}
+ */
+async function processMockOutput(): Promise<void> {
+  try {
+    const mockOutputPath = path.join(process.cwd(), "mock-output.json");
+
+    try {
+      await fs.access(mockOutputPath);
+    } catch (error) {
+      console.error(
+        "❌ Error: mock-output.json file not found in the current directory"
+      );
+      process.exit(1);
+    }
+
+    console.log("Reading mock-output.json...");
+    const mockOutputContent = await fs.readFile(mockOutputPath, "utf8");
+
+    let fileSpecs;
+    try {
+      fileSpecs = JSON.parse(mockOutputContent);
+    } catch (error) {
+      console.error("❌ Error: mock-output.json contains invalid JSON");
+      process.exit(1);
+    }
+
+    if (!Array.isArray(fileSpecs)) {
+      console.error("❌ Error: mock-output.json should contain an array");
+      process.exit(1);
+    }
+
+    console.log(`Found ${fileSpecs.length} file(s) to create...`);
+
+    for (const spec of fileSpecs) {
+      if (!spec.fileName || typeof spec.fileName !== "string") {
+        console.error(
+          "❌ Error: A file specification is missing the fileName property"
+        );
+        continue;
+      }
+
+      if (!spec.fileContent || typeof spec.fileContent !== "string") {
+        console.error(
+          `❌ Error: File specification for ${spec.fileName} is missing the fileContent property`
+        );
+        continue;
+      }
+
+      const filePath = path.join(process.cwd(), spec.fileName);
+      const dirPath = path.dirname(filePath);
+
+      // Create directory if it doesn't exist
+      if (!existsSync(dirPath)) {
+        console.log(`Creating directory: ${dirPath}`);
+        mkdirSync(dirPath, { recursive: true });
+      }
+
+      // Write the file
+      try {
+        writeFileSync(filePath, spec.fileContent);
+        console.log(`✅ Created file: ${spec.fileName}`);
+      } catch (error) {
+        console.error(`❌ Error creating file ${spec.fileName}:`, error);
+      }
+    }
+
+    console.log("\nFile generation complete!");
+  } catch (error) {
+    console.error("❌ Error processing mock-output.json:", error);
+    process.exit(1);
+  }
+}
+
 const program = new Command();
 
 program
@@ -574,6 +651,26 @@ program.action(async (options) => {
       zhankaiOptions.output,
       await fs.readFile(zhankaiOptions.output, "utf-8")
     );
+
+    /**
+     * Placeholder write function: copy mock-output.json
+     */
+    const mockOutputPath = path.join(process.cwd(), "mock-output.json");
+    try {
+      await fs.access(mockOutputPath);
+      // If it exists, process it
+      await processMockOutput();
+
+      // Continue with the normal query process
+      const baseDir = process.cwd();
+      const repoName = await getRepoName(baseDir);
+
+      // Rest of your existing query code...
+    } catch (error) {
+      // If mock-output.json doesn't exist, just continue with normal query
+      console.log("No mock-output.json found. Proceeding with normal query...");
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const rukhResponse = await sendQueryToRukh(
       zhankaiOptions.query,
