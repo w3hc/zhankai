@@ -12,57 +12,6 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-/**
- * K2000Loader - A simple loading animation for the CLI
- * Displays a moving dot animation similar to Knight Rider's K.I.T.T. scanner
- */
-class K2000Loader {
-  private position: number = 0;
-  private direction: number = 1;
-  private width: number = 10;
-  private interval: NodeJS.Timeout | null = null;
-  private lastLine: string = "";
-
-  /**
-   * Start the loading animation
-   */
-  start(): void {
-    if (this.interval) return;
-
-    this.interval = setInterval(() => {
-      process.stdout.write("\r" + " ".repeat(this.lastLine.length) + "\x1b[2A");
-
-      const line =
-        " ".repeat(this.position) +
-        "•" +
-        " ".repeat(this.width - this.position - 1) +
-        "\n\n";
-      this.lastLine = line;
-
-      process.stdout.write("\r" + line);
-
-      this.position += this.direction;
-
-      if (this.position >= this.width - 1) {
-        this.direction = -1;
-      } else if (this.position <= 0) {
-        this.direction = 1;
-      }
-    }, 30);
-  }
-
-  /**
-   * Stop the loading animation
-   */
-  stop(): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = null;
-      process.stdout.write("\r" + " ".repeat(this.lastLine.length) + "\r\n");
-    }
-  }
-}
-
 interface ZhankaiOptions {
   output: string;
   depth: number;
@@ -374,16 +323,11 @@ const sendQueryToRukh = async (
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000; // 2 seconds
 
-  // Create loader for visual feedback
-  const loader = new K2000Loader();
-  loader.start();
-
   try {
     // Validate input file access
     try {
       await fs.access(filePath);
     } catch (error) {
-      loader.stop();
       console.error("✗ Error accessing file:", error);
       throw new Error(`Cannot access file at path: ${filePath}`);
     }
@@ -444,7 +388,6 @@ const sendQueryToRukh = async (
 
         // Handle specific error responses
         if (response.status === 401) {
-          loader.stop();
           throw new Error(
             "Authentication failed. Please check your API credentials."
           );
@@ -484,7 +427,6 @@ const sendQueryToRukh = async (
           attemptCount++;
         } else {
           // For other status codes, don't retry
-          loader.stop();
           throw new Error(
             `API request failed with status ${response.status}: ${errorDetails}`
           );
@@ -501,7 +443,6 @@ const sendQueryToRukh = async (
           await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
           attemptCount++;
         } else {
-          loader.stop();
           throw new Error(
             `Failed to connect to API after ${MAX_RETRIES} attempts: ${fetchError.message}`
           );
@@ -511,7 +452,6 @@ const sendQueryToRukh = async (
 
     // If we've exited the loop without a response, all retries have failed
     if (!response || !response.ok) {
-      loader.stop();
       throw new Error("All API request attempts failed");
     }
 
@@ -522,7 +462,6 @@ const sendQueryToRukh = async (
     try {
       data = JSON.parse(responseBody);
     } catch (e) {
-      loader.stop();
       console.error("✗ Failed to parse JSON response:", e);
       console.log("Raw response:", responseBody.slice(0, 500) + "...");
       throw new Error("Failed to parse API response as JSON");
@@ -539,7 +478,6 @@ const sendQueryToRukh = async (
     const responseContent = data.output || data.answer || "";
 
     if (!responseContent) {
-      loader.stop();
       console.error("✗ No content found in response");
       console.log("Response structure:", Object.keys(data));
       throw new Error("Missing content in API response");
@@ -598,7 +536,7 @@ const sendQueryToRukh = async (
 
           if (Array.isArray(jsonOutput)) {
             console.log(
-              `\nFound ${jsonOutput.length} file(s) to create/update from API response...`
+              `\nFound ${jsonOutput.length} file(s) to create/update from API response...\n`
             );
 
             for (const spec of jsonOutput) {
@@ -621,7 +559,6 @@ const sendQueryToRukh = async (
 
               // Create directory if it doesn't exist
               if (!existsSync(dirPath)) {
-                console.log(`Creating directory: ${dirPath}`);
                 mkdirSync(dirPath, { recursive: true });
               }
 
@@ -653,11 +590,9 @@ const sendQueryToRukh = async (
     }
 
     // Stop the loading animation and return the formatted response
-    loader.stop();
     return formattedResponse;
   } catch (error) {
     // Handle all errors
-    loader.stop();
     console.error("\n✗ Error sending query to Rukh API:", error);
     if (error instanceof Error) {
       return `Failed to get response from Rukh API: ${error.message}`;
@@ -777,7 +712,7 @@ program.action(async (options) => {
   await fs.appendFile(zhankaiOptions.output, content);
 
   console.log(
-    `\nContent of all files and repo structure written: ${zhankaiOptions.output}`
+    `Content of all files and repo structure written: ${zhankaiOptions.output}`
   );
 
   // Handle query if provided
