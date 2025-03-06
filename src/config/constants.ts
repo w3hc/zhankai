@@ -20,8 +20,8 @@ export const constants = {
   /** Delay between retry attempts in milliseconds */
   RETRY_DELAY: 5000,
 
-  /** Default timeout for API requests in milliseconds (2 minutes) */
-  DEFAULT_TIMEOUT_MS: 120000,
+  /** Default timeout for API requests in milliseconds (4 minutes) */
+  DEFAULT_TIMEOUT_MS: 240000,
 
   /** Items to exclude from processing */
   EXCLUDED_ITEMS: ["LICENSE", ".git"],

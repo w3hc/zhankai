@@ -14,7 +14,9 @@
     "build": "tsc && npm install -g .",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "test": "echo \"No tests configured\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },
@@ -44,8 +46,10 @@
     "@types/prompts": "^2.4.9",
     "@typescript-eslint/eslint-plugin": "^8.26.0",
     "@typescript-eslint/parser": "^8.26.0",
+    "@vitest/coverage-v8": "^3.0.8",
     "eslint": "^9.21.0",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
   },
   "engines": {
     "node": ">=16.0.0"
