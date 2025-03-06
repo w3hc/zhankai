@@ -5,13 +5,17 @@ import path from "path";
 import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
-import { writeFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { exec } from "child_process";
 import prompts from "prompts";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
+/**
+ * K2000Loader - A simple loading animation for the CLI
+ * Displays a moving dot animation similar to Knight Rider's K.I.T.T. scanner
+ */
 class K2000Loader {
   private position: number = 0;
   private direction: number = 1;
@@ -19,6 +23,9 @@ class K2000Loader {
   private interval: NodeJS.Timeout | null = null;
   private lastLine: string = "";
 
+  /**
+   * Start the loading animation
+   */
   start(): void {
     if (this.interval) return;
 
@@ -44,6 +51,9 @@ class K2000Loader {
     }, 30);
   }
 
+  /**
+   * Stop the loading animation
+   */
   stop(): void {
     if (this.interval) {
       clearInterval(this.interval);
@@ -346,143 +356,240 @@ async function confirmProceedWithUncommittedChanges(): Promise<boolean> {
   return response.value;
 }
 
-async function handleQuery(query: string): Promise<void> {
-  // Check for uncommitted changes if we have a query
-  if (query) {
-    const hasChanges = await hasUncommittedChanges();
-
-    if (hasChanges) {
-      const shouldProceed = await confirmProceedWithUncommittedChanges();
-
-      if (!shouldProceed) {
-        console.log("Operation cancelled. Please commit your changes first.");
-        return;
-      }
-    }
-  }
-}
-
+/**
+ * Sends a query to the Rukh API and handles the response
+ * @param query The query string to send
+ * @param filePath Path to the file containing the context for the query
+ * @param debug Whether to enable debug mode
+ * @returns The formatted response from the API
+ */
 const sendQueryToRukh = async (
   query: string,
   filePath: string,
   debug: boolean
 ): Promise<string> => {
-  // const RUKH_API_URL = "https://rukh.w3hc.org/ask";
-  const RUKH_API_URL = "http://localhost:3000/ask";
+  // Define constants
+  // const RUKH_API_URL = "https://rukh.w3hc.org/ask"; // Production URL
+  const RUKH_API_URL = "http://localhost:3000/ask"; // Local development URL
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
+
+  // Create loader for visual feedback
   const loader = new K2000Loader();
+  loader.start();
 
   try {
+    // Validate input file access
     try {
       await fs.access(filePath);
     } catch (error) {
+      loader.stop();
       console.error("✗ Error accessing file:", error);
       throw new Error(`Cannot access file at path: ${filePath}`);
     }
 
+    // Read the file content
     const fileContent = await fs.readFile(filePath, "utf-8");
+    if (debug) {
+      console.log("\nDEBUG - File content length:", fileContent.length);
+      console.log(
+        "DEBUG - File content preview:",
+        fileContent.slice(0, 200) + "..."
+      );
+    }
 
+    // Prepare form data
     const formData = new FormData();
-
     formData.append("message", query);
-    formData.append("model", "anthropic");
+    formData.append("model", "anthropic"); // Using Anthropic's model for better responses
     formData.append("sessionId", "");
     formData.append("walletAddress", "");
     formData.append("context", "zhankai");
 
     const fileName = path.basename(filePath);
 
+    // Handle file attachment
     if (typeof File === "undefined") {
-      console.log(
-        "Running in Node.js environment - using Blob for file upload"
-      );
+      if (debug)
+        console.log(
+          "Running in Node.js environment - using Blob for file upload"
+        );
       const blob = new Blob([fileContent], { type: "text/markdown" });
       formData.append("file", blob, fileName);
     } else {
-      const file = new File([fileContent], fileName, {
-        type: "text/markdown",
-      });
+      const file = new File([fileContent], fileName, { type: "text/markdown" });
       formData.append("file", file);
     }
 
     console.log(`Sending request to ${RUKH_API_URL}`);
 
-    if (debug) {
-      console.log("\nDEBUG - File content (first 500 characters):");
-      console.log(fileContent.slice(0, 500));
-      console.log("...");
-    }
+    // Retry logic for API requests
+    let response;
+    let attemptCount = 0;
 
-    const response = await fetch(RUKH_API_URL, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      console.error(
-        `✗ Error response: ${response.status} ${response.statusText}`
-      );
-
-      let errorDetails = "";
+    while (attemptCount < MAX_RETRIES) {
       try {
-        const errorData = await response.text();
-        errorDetails = errorData;
-        console.error("Error details:", errorDetails);
-      } catch (e) {
-        console.error("Could not parse error response");
-      }
+        response = await fetch(RUKH_API_URL, {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+          },
+          body: formData,
+          // Adding timeout to avoid hanging requests
+          signal: AbortSignal.timeout(60000), // 60 second timeout
+        });
 
-      if (response.status === 401) {
-        throw new Error("Invalid API key. Please run 'zhankai setup' again.");
+        // If successful, break out of retry loop
+        if (response.ok) break;
+
+        // Handle specific error responses
+        if (response.status === 401) {
+          loader.stop();
+          throw new Error(
+            "Authentication failed. Please check your API credentials."
+          );
+        }
+
+        if (response.status === 429) {
+          console.warn(
+            `Rate limit hit. Retrying in ${RETRY_DELAY / 1000} seconds...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          attemptCount++;
+          continue;
+        }
+
+        // For other errors, try to extract error details
+        const errorText = await response.text();
+        let errorDetails = "Unknown error";
+
+        try {
+          // Try to parse as JSON
+          const errorJson = JSON.parse(errorText);
+          errorDetails =
+            errorJson.message || errorJson.error || JSON.stringify(errorJson);
+        } catch {
+          // If not JSON, use the text
+          errorDetails = errorText.slice(0, 200); // Limit error text length
+        }
+
+        console.error(`API error (${response.status}): ${errorDetails}`);
+
+        // Decide whether to retry based on status code
+        if ([500, 502, 503, 504].includes(response.status)) {
+          console.log(
+            `Server error. Retrying... (${attemptCount + 1}/${MAX_RETRIES})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          attemptCount++;
+        } else {
+          // For other status codes, don't retry
+          loader.stop();
+          throw new Error(
+            `API request failed with status ${response.status}: ${errorDetails}`
+          );
+        }
+      } catch (fetchError: any) {
+        // Network errors or timeouts
+        console.error(
+          `Request attempt ${attemptCount + 1} failed:`,
+          fetchError.message
+        );
+
+        if (attemptCount < MAX_RETRIES - 1) {
+          console.log(`Retrying in ${RETRY_DELAY / 1000} seconds...`);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          attemptCount++;
+        } else {
+          loader.stop();
+          throw new Error(
+            `Failed to connect to API after ${MAX_RETRIES} attempts: ${fetchError.message}`
+          );
+        }
       }
-      throw new Error(
-        `HTTP error! status: ${response.status}, details: ${errorDetails}`
-      );
     }
 
+    // If we've exited the loop without a response, all retries have failed
+    if (!response || !response.ok) {
+      loader.stop();
+      throw new Error("All API request attempts failed");
+    }
+
+    // Process successful response
     const responseBody = await response.text();
 
     let data;
     try {
       data = JSON.parse(responseBody);
     } catch (e) {
+      loader.stop();
       console.error("✗ Failed to parse JSON response:", e);
-      console.log("Raw response:", responseBody);
+      console.log("Raw response:", responseBody.slice(0, 500) + "...");
       throw new Error("Failed to parse API response as JSON");
     }
 
-    if (debug || !(data.answer || data.output)) {
+    if (debug) {
       console.log("\nResponse details:");
+      console.log("- Status:", response.status);
       console.log("- Headers:", Object.fromEntries(response.headers.entries()));
-      console.log("- Full response body:", data);
+      console.log("- Response data keys:", Object.keys(data));
     }
 
-    const responseContent = data.answer || data.output;
+    // Extract the content from the response
+    const responseContent = data.output || data.answer || "";
 
     if (!responseContent) {
-      console.error("✗ No answer or output field found in response");
+      loader.stop();
+      console.error("✗ No content found in response");
       console.log("Response structure:", Object.keys(data));
-      throw new Error("Missing answer/output field in API response");
+      throw new Error("Missing content in API response");
     }
 
+    // Prepare to save the response to a file
     const baseDir = process.cwd();
     const zhankaiDir = path.join(baseDir, "zhankai");
-
     const baseQueryFilename = "query.md";
     const queryFilePath = path.join(zhankaiDir, baseQueryFilename);
-
     const uniqueQueryFilename = await getUniqueFilename(queryFilePath);
 
-    await fs.writeFile(uniqueQueryFilename, responseContent, "utf-8");
-    console.log(`Response saved in ${uniqueQueryFilename}`);
+    // Save response to file
+    try {
+      await fs.writeFile(uniqueQueryFilename, responseContent, "utf-8");
+      // Verify the file was written correctly
+      const savedContent = await fs.readFile(uniqueQueryFilename, "utf-8");
 
+      if (savedContent.length === 0) {
+        console.warn(
+          "Warning: Saved file appears to be empty. Trying alternative method..."
+        );
+        // Try synchronous write as fallback
+        writeFileSync(uniqueQueryFilename, responseContent, "utf-8");
+      }
+
+      console.log(`Response saved in ${uniqueQueryFilename}`);
+    } catch (writeError) {
+      console.error("Error saving response to file:", writeError);
+      console.log("Attempting alternate save method...");
+
+      try {
+        // Fallback to sync file writing
+        writeFileSync(uniqueQueryFilename, responseContent, "utf-8");
+        console.log(
+          `Response saved in ${uniqueQueryFilename} (using fallback method)`
+        );
+      } catch (syncWriteError) {
+        console.error(
+          "Failed to save response with fallback method:",
+          syncWriteError
+        );
+        // Continue execution, as we still have the response in memory
+      }
+    }
+
+    // Format the response for terminal output
     const formattedResponse = formatMarkdownForTerminal(responseContent);
 
-    /**
-     * Process the API response to create or modify files
-     */
+    // Process the API response if it contains file specifications
     try {
       if (data.output && typeof data.output === "string") {
         // Try to parse the output as JSON
@@ -530,7 +637,7 @@ const sendQueryToRukh = async (
               }
             }
 
-            console.log("\nDone!");
+            console.log("\nDone! ✅");
           }
         } catch (error) {
           // Not valid JSON or not an array - this is normal for most responses
@@ -545,8 +652,12 @@ const sendQueryToRukh = async (
       console.error("Error processing API response as code:", error);
     }
 
+    // Stop the loading animation and return the formatted response
+    loader.stop();
     return formattedResponse;
   } catch (error) {
+    // Handle all errors
+    loader.stop();
     console.error("\n✗ Error sending query to Rukh API:", error);
     if (error instanceof Error) {
       return `Failed to get response from Rukh API: ${error.message}`;
@@ -555,6 +666,10 @@ const sendQueryToRukh = async (
   }
 };
 
+/**
+ * Add a pattern to .gitignore if it doesn't already exist
+ * @param pattern The pattern to add to .gitignore
+ */
 async function addToGitignore(pattern: string): Promise<void> {
   try {
     const gitignorePath = path.join(process.cwd(), ".gitignore");
@@ -562,7 +677,9 @@ async function addToGitignore(pattern: string): Promise<void> {
     let currentContent = "";
     try {
       currentContent = await fs.readFile(gitignorePath, "utf8");
-    } catch (error) {}
+    } catch (error) {
+      // Gitignore doesn't exist, we'll create a new one
+    }
 
     if (!currentContent.split("\n").some((line) => line.trim() === pattern)) {
       const newContent =
@@ -571,17 +688,18 @@ async function addToGitignore(pattern: string): Promise<void> {
           : `${currentContent}${pattern}\n`;
 
       await fs.writeFile(gitignorePath, newContent, "utf8");
-      console.log(`Added /zhankai to .gitignore`);
+      console.log(`Added ${pattern} to .gitignore`);
     }
   } catch (error) {
     console.error("Error updating .gitignore:", error);
   }
 }
 
+// Set up command line interface
 const program = new Command();
 
 program
-  .version("1.1.5")
+  .version("1.4.0")
   .option("-o, --output <filename>", "output filename")
   .option("-d, --depth <number>", "maximum depth to traverse", "Infinity")
   .option("-c, --contents", "include file contents", false)
@@ -613,16 +731,10 @@ program.action(async (options) => {
     console.error("Error accessing zhankai directory:", error);
   }
 
-  const gitignorePath = path.join(baseDir, ".gitignore");
-  try {
-    await fs.access(gitignorePath);
-    await addToGitignore("/zhankai");
-  } catch {
-    console.log(
-      "No .gitignore file found. Skipping addition of /zhankai to .gitignore."
-    );
-  }
+  // Add /zhankai to .gitignore
+  await addToGitignore("/zhankai");
 
+  // Generate unique output filename
   let baseOutputFilename = options.output || `${repoName}_app_description.md`;
   const outputPath = path.join(zhankaiDir, baseOutputFilename);
   const uniqueOutputFilename = await getUniqueFilename(outputPath);
@@ -635,14 +747,18 @@ program.action(async (options) => {
     debug: options.debug,
   };
 
+  // Load gitignore patterns
   const gitignorePatterns = await loadGitignorePatterns(baseDir);
   const ig = ignore().add(gitignorePatterns);
 
+  // Initialize output file with repo name
   let content = `# ${repoName}\n\n`;
   await fs.writeFile(zhankaiOptions.output, content);
 
+  // Traverse directory and generate content
   await traverseDirectory(baseDir, zhankaiOptions, 0, baseDir, ig);
 
+  // Generate and append file structure
   const fileStructure = await generateFileStructure(
     baseDir,
     zhankaiOptions.depth,
@@ -656,6 +772,7 @@ program.action(async (options) => {
     `\n## Structure\n\n\`\`\`\n${fileStructure}\`\`\`\n`
   );
 
+  // Add timestamp
   content = `\nTimestamp: ${generateTimestamp()}`;
   await fs.appendFile(zhankaiOptions.output, content);
 
@@ -663,12 +780,9 @@ program.action(async (options) => {
     `\nContent of all files and repo structure written: ${zhankaiOptions.output}`
   );
 
+  // Handle query if provided
   if (zhankaiOptions.query) {
-    await fs.writeFile(
-      zhankaiOptions.output,
-      await fs.readFile(zhankaiOptions.output, "utf-8")
-    );
-
+    // Check for uncommitted changes
     const hasChanges = await hasUncommittedChanges();
 
     if (hasChanges) {
@@ -680,13 +794,13 @@ program.action(async (options) => {
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    const rukhResponse = await sendQueryToRukh(
+    // Send query to Rukh API
+    console.log(`\nProcessing query: "${zhankaiOptions.query}"`);
+    await sendQueryToRukh(
       zhankaiOptions.query,
       zhankaiOptions.output,
       zhankaiOptions.debug || false
     );
-    // console.log(rukhResponse);
   }
 });
 
