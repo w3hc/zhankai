@@ -5,12 +5,14 @@
 
 CLI tool for exporting repository content into a structured markdown file for LLM processing.
 
+Zhankai leverages the Rukh API which connects to Anthropic's [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet) model
+
 ## Features
 
 - 📄 Markdown file generation from repository content
 - 🔍 `.gitignore` integration
 - 📊 Repository structure visualization
-- ❓ AI-assisted query system
+- 🧠 AI-assisted query system (Claude 3.7 Sonnet)
 - 🔄 File truncation (30 lines preview for 500+ line files)
 - 🖼️ Binary file handling with placeholders
 - 📁 Automatic output organization in a dedicated folder
@@ -38,23 +40,20 @@ zhankai
 
 ## Commands
 
-### Documentation Generation
+### Custom output file
 
 ```bash
-# Default output
-zhankai
-
-# Custom output file
 zhankai -o custom-docs.md
+```
 
-# Directory depth limitation
-zhankai -d 2
+### Ask LLM
 
-# Include file contents
-zhankai -c
+Uses [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet).
 
-# Query Rukh API (https://github.com/w3hc/rukh)
-zhankai -q "Describe this app"
+> ⚠️ **Important:** Commit your changes before using the `-q` option. Zhankai will directly edit your code files when responding to queries, so having unsaved commits may lead to unexpected changes or conflicts.
+
+```bash
+zhankai -q "Add this or that feature"
 ```
 
 ## Options
@@ -64,7 +63,7 @@ zhankai -q "Describe this app"
 | `-o, --output <filename>` | Output file specification | `<REPOSITORY_NAME>_app_description.md` |
 | `-d, --depth <number>` | Directory traversal depth | `Infinity` |
 | `-c, --contents` | Content inclusion flag | `false` |
-| `-q, --query <string>` | AI query string | - |
+| `-q, --query <string>` | AI query to Claude 3.7 Sonnet via Rukh API | - |
 | `--version` | Version information | - |
 
 ## Output Organization
