@@ -56,6 +56,19 @@ Uses [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-so
 zhankai -q "Add this or that feature"
 ```
 
+## Test
+
+```bash
+# Run tests once
+pnpm test
+
+# Run tests in watch mode during development
+pnpm test:watch
+
+# Run tests with coverage report
+pnpm test:coverage
+```
+
 ## Options
 
 | Option | Description | Default |

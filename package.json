@@ -1,7 +1,7 @@
 {
   "name": "zhankai",
   "version": "1.4.0",
-  "description": "Writes the content of all files of a given repo",
+  "description": "CLI tool for exporting repository content into a structured markdown file for LLM processing",
   "main": "dist/index.js",
   "bin": {
     "zhankai": "./dist/index.js"
@@ -11,8 +11,13 @@
     "url": "https://github.com/w3hc/zhankai.git"
   },
   "scripts": {
-    "build": "tsc && npm install -g . && zhankai",
+    "build": "tsc && npm install -g .",
+    "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -30,15 +35,23 @@
   "author": "Julien Béranger",
   "license": "GPL-3.0",
   "dependencies": {
-    "commander": "^8.3.0",
-    "ethers": "^6.13.4",
-    "ignore": "^5.3.2",
+    "commander": "^13.1.0",
+    "ethers": "^6.13.5",
+    "ignore": "^7.0.3",
     "keytar": "^7.9.0",
     "prompts": "^2.4.2"
   },
   "devDependencies": {
-    "@types/node": "^16.18.104",
+    "@types/node": "^22.13.9",
     "@types/prompts": "^2.4.9",
-    "typescript": "^4.5.2"
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "@vitest/coverage-v8": "^3.0.8",
+    "eslint": "^9.21.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
