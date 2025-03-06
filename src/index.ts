@@ -6,6 +6,11 @@ import { Command } from "commander";
 import { Dirent } from "fs";
 import ignore from "ignore";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
+import { exec } from "child_process";
+import prompts from "prompts";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 class K2000Loader {
   private position: number = 0;
@@ -304,6 +309,58 @@ const formatMarkdownForTerminal = (markdown: string): string => {
 
   return "\n" + formatted + "\n";
 };
+
+/**
+ * Checks if there are uncommitted changes in the git repository
+ * @returns Promise<boolean> - true if there are uncommitted changes, false otherwise
+ */
+async function hasUncommittedChanges(): Promise<boolean> {
+  try {
+    // Check if we're in a git repository
+    await execAsync("git rev-parse --is-inside-work-tree");
+
+    // Get git status in porcelain format
+    const { stdout } = await execAsync("git status --porcelain");
+
+    // If stdout is not empty, there are uncommitted changes
+    return stdout.trim().length > 0;
+  } catch (error) {
+    // Not a git repository or git not installed
+    return false;
+  }
+}
+
+/**
+ * Asks the user for confirmation to proceed with the query despite uncommitted changes
+ * @returns Promise<boolean> - true if user confirms, false otherwise
+ */
+async function confirmProceedWithUncommittedChanges(): Promise<boolean> {
+  const response = await prompts({
+    type: "confirm",
+    name: "value",
+    message:
+      "Uncommitted changes detected. Proceeding might overwrite files. Continue anyway?",
+    initial: false,
+  });
+
+  return response.value;
+}
+
+async function handleQuery(query: string): Promise<void> {
+  // Check for uncommitted changes if we have a query
+  if (query) {
+    const hasChanges = await hasUncommittedChanges();
+
+    if (hasChanges) {
+      const shouldProceed = await confirmProceedWithUncommittedChanges();
+
+      if (!shouldProceed) {
+        console.log("Operation cancelled. Please commit your changes first.");
+        return;
+      }
+    }
+  }
+}
 
 const sendQueryToRukh = async (
   query: string,
@@ -641,6 +698,17 @@ program.action(async (options) => {
       zhankaiOptions.output,
       await fs.readFile(zhankaiOptions.output, "utf-8")
     );
+
+    const hasChanges = await hasUncommittedChanges();
+
+    if (hasChanges) {
+      const shouldProceed = await confirmProceedWithUncommittedChanges();
+
+      if (!shouldProceed) {
+        console.log("Operation cancelled. Please commit your changes first.");
+        return;
+      }
+    }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const rukhResponse = await sendQueryToRukh(
