@@ -372,22 +372,14 @@ const sendQueryToRukh = async (
   const loader = new K2000Loader();
 
   try {
-    console.log("\nSending query to Rukh API...");
-    console.log(`Query: "${query}"`);
-    console.log(`File: ${filePath}`);
-
-    loader.start();
-
     try {
       await fs.access(filePath);
-      console.log("✓ File exists and is accessible");
     } catch (error) {
       console.error("✗ Error accessing file:", error);
       throw new Error(`Cannot access file at path: ${filePath}`);
     }
 
     const fileContent = await fs.readFile(filePath, "utf-8");
-    console.log(`✓ File read successfully (${fileContent.length} bytes)`);
 
     const formData = new FormData();
 
@@ -406,23 +398,13 @@ const sendQueryToRukh = async (
       const blob = new Blob([fileContent], { type: "text/markdown" });
       formData.append("file", blob, fileName);
     } else {
-      console.log("Running in browser environment - using File API");
       const file = new File([fileContent], fileName, {
         type: "text/markdown",
       });
       formData.append("file", file);
     }
 
-    console.log("✓ FormData created with all required fields and file");
-    console.log(`→ Sending request to ${RUKH_API_URL}`);
-
-    console.log("Request details:");
-    console.log("- Method: POST");
-    console.log(`- File name: ${fileName}`);
-    console.log(`- File size: ${fileContent.length} bytes`);
-    console.log(
-      "- Fields included: message, model, sessionId, walletAddress, context (zhankai), file"
-    );
+    console.log(`Sending request to ${RUKH_API_URL}`);
 
     if (debug) {
       console.log("\nDEBUG - File content (first 500 characters):");
@@ -437,10 +419,6 @@ const sendQueryToRukh = async (
       },
       body: formData,
     });
-
-    console.log(
-      `← Received response with status: ${response.status} ${response.statusText}`
-    );
 
     if (!response.ok) {
       console.error(
@@ -464,15 +442,11 @@ const sendQueryToRukh = async (
       );
     }
 
-    console.log("✓ Received successful response");
-
     const responseBody = await response.text();
-    console.log(`✓ Response body received (${responseBody.length} bytes)`);
 
     let data;
     try {
       data = JSON.parse(responseBody);
-      console.log("✓ Response JSON parsed successfully");
     } catch (e) {
       console.error("✗ Failed to parse JSON response:", e);
       console.log("Raw response:", responseBody);
@@ -493,8 +467,6 @@ const sendQueryToRukh = async (
       throw new Error("Missing answer/output field in API response");
     }
 
-    console.log("✓ Response text extracted from response");
-
     const baseDir = process.cwd();
     const zhankaiDir = path.join(baseDir, "zhankai");
 
@@ -504,7 +476,7 @@ const sendQueryToRukh = async (
     const uniqueQueryFilename = await getUniqueFilename(queryFilePath);
 
     await fs.writeFile(uniqueQueryFilename, responseContent, "utf-8");
-    console.log(`✓ Response saved to file: ${uniqueQueryFilename}`);
+    console.log(`Response saved in ${uniqueQueryFilename}`);
 
     const formattedResponse = formatMarkdownForTerminal(responseContent);
 
@@ -549,7 +521,7 @@ const sendQueryToRukh = async (
               // Write the file
               try {
                 writeFileSync(filePath, spec.fileContent);
-                console.log(`✅ Created/Updated file: ${spec.fileName}`);
+                console.log(`Created/Updated file: ${spec.fileName}`);
               } catch (error) {
                 console.error(
                   `❌ Error creating/updating file ${spec.fileName}:`,
@@ -558,7 +530,7 @@ const sendQueryToRukh = async (
               }
             }
 
-            console.log("\nFile generation complete!");
+            console.log("\nDone!");
           }
         } catch (error) {
           // Not valid JSON or not an array - this is normal for most responses
@@ -573,10 +545,8 @@ const sendQueryToRukh = async (
       console.error("Error processing API response as code:", error);
     }
 
-    loader.stop();
     return formattedResponse;
   } catch (error) {
-    loader.stop();
     console.error("\n✗ Error sending query to Rukh API:", error);
     if (error instanceof Error) {
       return `Failed to get response from Rukh API: ${error.message}`;
@@ -716,7 +686,7 @@ program.action(async (options) => {
       zhankaiOptions.output,
       zhankaiOptions.debug || false
     );
-    console.log(rukhResponse);
+    // console.log(rukhResponse);
   }
 });
 
