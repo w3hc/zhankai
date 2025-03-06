@@ -1,0 +1,10 @@
+[
+    {
+        "fileName": "src/bonus.ts",
+        "fileContent": "Hello bonus!"
+    },
+    {
+        "fileName": "src/bonus2.ts",
+        "fileContent": "Hello bonus2!"
+    }
+]
