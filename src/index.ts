@@ -9,6 +9,7 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync } from "fs";
 import { exec } from "child_process";
 import prompts from "prompts";
 import { promisify } from "util";
+import { TerminalLoader } from "./loader";
 
 const execAsync = promisify(exec);
 
@@ -365,7 +366,8 @@ const sendQueryToRukh = async (
       formData.append("file", file);
     }
 
-    console.log(`Sending request to ${RUKH_API_URL}`);
+    const loader = new TerminalLoader(`Sending request to ${RUKH_API_URL}`);
+    loader.start();
 
     // Retry logic for API requests
     let response;
@@ -565,7 +567,7 @@ const sendQueryToRukh = async (
               // Write the file
               try {
                 writeFileSync(filePath, spec.fileContent);
-                console.log(`Created/Updated file: ${spec.fileName}`);
+                console.log(`- Created/Updated file: ${spec.fileName}`);
               } catch (error) {
                 console.error(
                   `❌ Error creating/updating file ${spec.fileName}:`,
@@ -589,6 +591,7 @@ const sendQueryToRukh = async (
       console.error("Error processing API response as code:", error);
     }
 
+    loader.stop();
     // Stop the loading animation and return the formatted response
     return formattedResponse;
   } catch (error) {
