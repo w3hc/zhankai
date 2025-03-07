@@ -178,7 +178,7 @@ async function handleQuery(config: ZhankaiConfig): Promise<void> {
   }
 
   // Send query to Rukh API
-  logger.info(`\nProcessing query: "${config.query}"`);
+  logger.info(`Processing query: "${config.query}"`);
   await apiUtils.sendQueryToRukh(
     config.query || "",
     config.output,
