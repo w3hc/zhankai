@@ -11,7 +11,7 @@
     "url": "https://github.com/w3hc/zhankai.git"
   },
   "scripts": {
-    "build": "tsc && npm install -g .",
+    "build": "rm -rf dist && tsc && pnpm install -g . --force",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
