@@ -79,8 +79,16 @@ global.Blob = vi.fn();
 global.File = vi.fn();
 global.AbortController = vi.fn(() => ({
   abort: vi.fn(),
-  signal: {},
-}));
+  signal: {
+    aborted: false,
+    onabort: null,
+    reason: undefined,
+    throwIfAborted: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  },
+})) as unknown as typeof AbortController;
 
 describe("apiUtils", () => {
   beforeEach(() => {
