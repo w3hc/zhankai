@@ -192,12 +192,26 @@ export const apiUtils = {
       // Process successful response
       const responseBody = await response.text();
 
+      // Save raw response for debugging
+      const baseDir = process.cwd();
+      const zhankaiDir = path.join(baseDir, constants.ZHANKAI_DIR);
+      const rawResponsePath = path.join(zhankaiDir, "raw_response.txt");
+
+      try {
+        await fs.writeFile(rawResponsePath, responseBody, "utf-8");
+        if (debug) {
+          logger.debug(`Raw response saved to ${rawResponsePath}`);
+        }
+      } catch (writeError) {
+        logger.error("Failed to save raw response:", writeError);
+      }
+
       let data: RukhResponse;
       try {
         data = JSON.parse(responseBody);
       } catch (e) {
         logger.error("✗ Failed to parse JSON response:", e);
-        logger.debug("Raw response:", responseBody.slice(0, 500) + "...");
+        logger.debug("Raw response:", responseBody.slice(0, 1000) + "...");
         throw new Error("Failed to parse API response as JSON");
       }
 
@@ -226,8 +240,6 @@ export const apiUtils = {
       }
 
       // Prepare to save the response to a file
-      const baseDir = process.cwd();
-      const zhankaiDir = path.join(baseDir, constants.ZHANKAI_DIR);
       const baseQueryFilename = "query.md";
       const queryFilePath = path.join(zhankaiDir, baseQueryFilename);
       const uniqueQueryFilename = await fileUtils.getUniqueFilename(
@@ -293,11 +305,57 @@ export const apiUtils = {
    */
   async processResponseForFileUpdates(data: RukhResponse): Promise<void> {
     try {
-      if (data.output && typeof data.output === "string") {
-        // Try to parse the output as JSON
-        try {
-          const jsonOutput = JSON.parse(data.output);
+      // First check the filesToUpdate field if it exists
+      if (
+        data.filesToUpdate &&
+        Array.isArray(data.filesToUpdate) &&
+        data.filesToUpdate.length > 0
+      ) {
+        logger.info(
+          `\nFound ${data.filesToUpdate.length} file(s) to update from filesToUpdate field...\n`
+        );
 
+        for (const fileSpec of data.filesToUpdate) {
+          await this.updateFile(fileSpec);
+        }
+
+        logger.info("\nDone! ✅");
+        return;
+      }
+
+      // Then try to parse the output as JSON
+      if (data.output && typeof data.output === "string") {
+        try {
+          // Try to extract file specs if they're in JSON format
+          // This regex looks for an array of objects with fileName and fileContent properties
+          const jsonRegex =
+            /\[\s*\{\s*"fileName"\s*:\s*"[^"]+"\s*,\s*"fileContent"\s*:\s*"(?:\\"|[^"])+"\s*\}\s*(?:,\s*\{\s*"fileName"\s*:\s*"[^"]+"\s*,\s*"fileContent"\s*:\s*"(?:\\"|[^"])+"\s*\}\s*)*\]/;
+          const match = data.output.match(jsonRegex);
+
+          if (match) {
+            try {
+              const jsonOutput = JSON.parse(match[0]);
+              if (Array.isArray(jsonOutput) && jsonOutput.length > 0) {
+                logger.info(
+                  `\nFound ${jsonOutput.length} file(s) to create/update from JSON in output...\n`
+                );
+
+                for (const spec of jsonOutput) {
+                  if (spec.fileName && spec.fileContent) {
+                    await this.updateFile(spec);
+                  }
+                }
+
+                logger.info("\nDone! ✅");
+                return;
+              }
+            } catch (err) {
+              logger.error("Failed to parse JSON in output:", err);
+            }
+          }
+
+          // If not found with regex, try direct JSON parse
+          const jsonOutput = JSON.parse(data.output);
           if (Array.isArray(jsonOutput)) {
             logger.info(
               `\nFound ${jsonOutput.length} file(s) to create/update from API response...\n`
@@ -329,19 +387,6 @@ export const apiUtils = {
             "Response is not a valid JSON array, continuing with normal processing."
           );
         }
-      }
-
-      // Also check filesToUpdate field if it exists
-      if (data.filesToUpdate && Array.isArray(data.filesToUpdate)) {
-        logger.info(
-          `\nFound ${data.filesToUpdate.length} file(s) to update from filesToUpdate field...\n`
-        );
-
-        for (const fileSpec of data.filesToUpdate) {
-          await this.updateFile(fileSpec);
-        }
-
-        logger.info("\nDone! ✅");
       }
     } catch (error) {
       logger.error("Error processing API response for file updates:", error);
