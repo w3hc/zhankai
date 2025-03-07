@@ -12,7 +12,8 @@ export const constants = {
   PREVIEW_LINES: 30,
 
   /** URL for Rukh API */
-  RUKH_API_URL: "https://rukh.w3hc.org/ask",
+  // RUKH_API_URL: "https://rukh.w3hc.org/ask",
+  RUKH_API_URL: "http://localhost:3000/ask",
 
   /** Maximum API retry attempts */
   MAX_RETRIES: 5,
