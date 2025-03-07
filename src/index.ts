@@ -9,9 +9,9 @@ import { gitUtils } from "./utils/git";
 import { fileUtils } from "./utils/file";
 import { markdownUtils } from "./utils/markdown";
 import { apiUtils } from "./utils/api";
-import { TerminalLoader } from "./ui/loader";
 import { logger } from "./ui/logger";
 import { constants } from "./config/constants";
+import { githubUtils } from "./utils/github";
 
 const packageJsonPath = path.join(__dirname, "..", "package.json");
 const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -47,6 +47,13 @@ async function main() {
       process.exit(1);
     }
   });
+
+  program
+    .command("login")
+    .description("Check if you are authenticated with GitHub via Git")
+    .action(async () => {
+      await githubUtils.checkGitHubAuth();
+    });
 
   program.parse(process.argv);
 }
