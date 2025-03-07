@@ -4,14 +4,14 @@
   "description": "CLI tool for exporting repository content into a structured markdown file for LLM processing",
   "main": "dist/index.js",
   "bin": {
-    "zhankai": "./dist/index.js"
+    "zhankai": "dist/src/index.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/w3hc/zhankai.git"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc && pnpm install -g . --force",
+    "build": "rm -rf dist && tsc && chmod +x dist/src/index.js && pnpm install -g . --force",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "test": "vitest run",
@@ -35,10 +35,12 @@
   "author": "Julien Béranger",
   "license": "GPL-3.0",
   "dependencies": {
+    "@octokit/rest": "^20.0.2",
     "commander": "^13.1.0",
     "ethers": "^6.13.5",
     "ignore": "^7.0.3",
     "keytar": "^7.9.0",
+    "open": "^10.1.0",
     "prompts": "^2.4.2"
   },
   "devDependencies": {
