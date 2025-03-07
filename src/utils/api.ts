@@ -319,7 +319,7 @@ export const apiUtils = {
           await this.updateFile(fileSpec);
         }
 
-        logger.info("\nDone! ✅");
+        logger.info("Done! ✅");
         return;
       }
 
@@ -346,7 +346,7 @@ export const apiUtils = {
                   }
                 }
 
-                logger.info("\nDone! ✅");
+                logger.info("Done! ✅");
                 return;
               }
             } catch (err) {
@@ -379,7 +379,7 @@ export const apiUtils = {
               await this.updateFile(spec);
             }
 
-            logger.info("\nDone! ✅");
+            logger.info("Done! ✅");
           }
         } catch (error) {
           // Not valid JSON or not an array - this is normal for most responses
