@@ -5,13 +5,17 @@ import { Command } from "commander";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import prompts from "prompts";
 import { ZhankaiConfig } from "./utils/types";
+import { GitHubCredentials } from "./utils/github-auth";
 import { gitUtils } from "./utils/git";
 import { fileUtils } from "./utils/file";
 import { markdownUtils } from "./utils/markdown";
 import { apiUtils } from "./utils/api";
-import { TerminalLoader } from "./ui/loader";
 import { logger } from "./ui/logger";
 import { constants } from "./config/constants";
+import { colors } from "./config/constants";
+import { githubUtils } from "./utils/github";
+import { walletUtils } from "./utils/wallet";
+import { githubAuthUtils } from "./utils/github-auth";
 
 const packageJsonPath = path.join(__dirname, "..", "package.json");
 const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -48,7 +52,173 @@ async function main() {
     }
   });
 
+  program
+    .command("login")
+    .description(
+      "Authenticate with GitHub and generate an Ethereum wallet derived from your GitHub identity"
+    )
+    .action(async () => {
+      try {
+        // First check GitHub authentication via Git (basic check)
+        await githubUtils.checkGitHubAuth();
+
+        // Always authenticate with GitHub first
+        logger.info(
+          "GitHub authentication is required to generate your wallet"
+        );
+        const githubCredentials = await handleGitHubAuth();
+
+        if (!githubCredentials) {
+          logger.error("GitHub authentication is required to proceed");
+          return;
+        }
+
+        // Check if wallet already exists
+        const walletExists = await walletUtils.walletExists();
+
+        if (walletExists) {
+          const existingWallet = await walletUtils.getWalletCredentials();
+          if (existingWallet) {
+            logger.info(
+              `Ethereum wallet already exists: ${existingWallet.address}`
+            );
+
+            // Ask if user wants to regenerate wallet from GitHub identity
+            const response = await prompts({
+              type: "confirm",
+              name: "regenerate",
+              message:
+                "Do you want to regenerate your wallet from your GitHub identity? (This will overwrite the existing one)",
+              initial: false,
+            });
+
+            if (!response.regenerate) {
+              return;
+            }
+          }
+        }
+
+        // Generate a wallet derived from GitHub username
+        logger.info(
+          `Generating Ethereum wallet derived from GitHub identity: ${githubCredentials.username}`
+        );
+        const wallet = await walletUtils.generateWalletFromGitHub(
+          githubCredentials.username
+        );
+
+        logger.info(
+          `${colors.FG_GREEN}✓ Wallet generated successfully!${colors.RESET}`
+        );
+        logger.info(`${colors.BOLD}Address:${colors.RESET} ${wallet.address}`);
+        logger.info(
+          `${colors.BOLD}Source:${colors.RESET} Derived from GitHub username: ${githubCredentials.username}`
+        );
+        logger.info(
+          `${colors.FG_YELLOW}Important: Your wallet private key is stored securely in your home directory.${colors.RESET}`
+        );
+      } catch (error) {
+        logger.error("Failed during login:", error);
+      }
+    });
+
+  program
+    .command("github")
+    .description("Authenticate with GitHub using Personal Access Token")
+    .action(async () => {
+      try {
+        const credentials = await handleGitHubAuth();
+        if (credentials) {
+          logger.info(
+            `${colors.FG_GREEN}✓ Successfully authenticated as GitHub user: ${colors.BOLD}${credentials.username}${colors.RESET}`
+          );
+        }
+      } catch (error) {
+        logger.error("Failed during GitHub authentication:", error);
+      }
+    });
+
+  program
+    .command("logout")
+    .description("Clear stored GitHub credentials")
+    .action(async () => {
+      try {
+        await githubAuthUtils.clearCredentials();
+        logger.info(
+          `${colors.FG_GREEN}✓ Successfully logged out from GitHub${colors.RESET}`
+        );
+      } catch (error) {
+        logger.error("Failed to logout:", error);
+      }
+    });
+
+  program
+    .command("sign")
+    .description("Sign a message with your Ethereum wallet")
+    .argument("<message>", "message to sign")
+    .action(async (message) => {
+      try {
+        const result = await walletUtils.signMessage(message);
+
+        if (!result) {
+          logger.error(
+            "Failed to sign message. No wallet found. Please run 'zhankai login' first."
+          );
+          return;
+        }
+
+        logger.info(`${colors.BOLD}Message:${colors.RESET} ${result.message}`);
+        logger.info(
+          `${colors.BOLD}Message Hash:${colors.RESET} ${result.messageHash}`
+        );
+        logger.info(
+          `${colors.BOLD}Signature:${colors.RESET} ${result.signature}`
+        );
+      } catch (error) {
+        logger.error("Failed to sign message:", error);
+      }
+    });
+
   program.parse(process.argv);
+}
+
+/**
+ * Handle GitHub authentication using personal access token
+ * @returns GitHub credentials if authentication successful, null otherwise
+ */
+async function handleGitHubAuth(): Promise<GitHubCredentials | null> {
+  // Check if already authenticated
+  const isAuthenticated = await githubAuthUtils.isAuthenticated();
+
+  if (isAuthenticated) {
+    const credentials = await githubAuthUtils.getGitHubCredentials();
+    if (credentials) {
+      logger.info(
+        `Already authenticated with GitHub as: ${colors.BOLD}${credentials.username}${colors.RESET}`
+      );
+
+      // Ask if user wants to re-authenticate
+      const response = await prompts({
+        type: "confirm",
+        name: "reauth",
+        message: "Do you want to re-authenticate with GitHub?",
+        initial: false,
+      });
+
+      if (!response.reauth) {
+        return credentials;
+      }
+    }
+  }
+
+  // Authenticate with GitHub using PAT
+  const githubCredentials = await githubAuthUtils.authenticate();
+
+  if (!githubCredentials) {
+    logger.error("GitHub authentication failed or was cancelled.");
+    return null;
+  }
+
+  return githubCredentials;
 }
 
 /**
@@ -171,7 +341,7 @@ async function handleQuery(config: ZhankaiConfig): Promise<void> {
   }
 
   // Send query to Rukh API
-  logger.info(`\nProcessing query: "${config.query}"`);
+  logger.info(`Processing query: "${config.query}"`);
   await apiUtils.sendQueryToRukh(
     config.query || "",
     config.output,
