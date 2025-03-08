@@ -14,6 +14,7 @@ import { constants } from "./config/constants";
 import { colors } from "./config/constants";
 import { githubUtils } from "./utils/github";
 import { walletUtils } from "./utils/wallet";
+import { githubAuthUtils } from "./utils/github-auth";
 
 const packageJsonPath = path.join(__dirname, "..", "package.json");
 const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -53,11 +54,12 @@ async function main() {
   program
     .command("login")
     .description(
-      "Generate an Ethereum wallet and authenticate with GitHub via Git"
+      "Generate an Ethereum wallet and authenticate with GitHub via OAuth"
     )
-    .action(async () => {
+    .option("--skip-github", "Skip GitHub OAuth authentication", false)
+    .action(async (options) => {
       try {
-        // First check GitHub authentication
+        // First check GitHub authentication via Git (basic check)
         await githubUtils.checkGitHubAuth();
 
         // Check if wallet already exists
@@ -80,6 +82,10 @@ async function main() {
             });
 
             if (!response.generateNew) {
+              // Skip to GitHub auth if user doesn't want a new wallet
+              if (!options.skipGithub) {
+                await handleGitHubAuth();
+              }
               return;
             }
           }
@@ -96,8 +102,38 @@ async function main() {
         logger.info(
           `${colors.FG_YELLOW}Important: Your wallet private key is stored securely in your home directory.${colors.RESET}`
         );
+
+        // After wallet creation, proceed with GitHub OAuth (unless skipped)
+        if (!options.skipGithub) {
+          await handleGitHubAuth();
+        }
       } catch (error) {
         logger.error("Failed during login:", error);
+      }
+    });
+
+  program
+    .command("github")
+    .description("Authenticate with GitHub using Personal Access Token")
+    .action(async () => {
+      try {
+        await handleGitHubAuth();
+      } catch (error) {
+        logger.error("Failed during GitHub authentication:", error);
+      }
+    });
+
+  program
+    .command("logout")
+    .description("Clear stored GitHub credentials")
+    .action(async () => {
+      try {
+        await githubAuthUtils.clearCredentials();
+        logger.info(
+          `${colors.FG_GREEN}✓ Successfully logged out from GitHub${colors.RESET}`
+        );
+      } catch (error) {
+        logger.error("Failed to logout:", error);
       }
     });
 
@@ -129,6 +165,42 @@ async function main() {
     });
 
   program.parse(process.argv);
+}
+
+/**
+ * Handle GitHub authentication using personal access token
+ */
+async function handleGitHubAuth(): Promise<void> {
+  // Check if already authenticated
+  const isAuthenticated = await githubAuthUtils.isAuthenticated();
+
+  if (isAuthenticated) {
+    const credentials = await githubAuthUtils.getGitHubCredentials();
+    if (credentials) {
+      logger.info(
+        `Already authenticated with GitHub as: ${colors.BOLD}${credentials.username}${colors.RESET}`
+      );
+
+      // Ask if user wants to re-authenticate
+      const response = await prompts({
+        type: "confirm",
+        name: "reauth",
+        message: "Do you want to re-authenticate with GitHub?",
+        initial: false,
+      });
+
+      if (!response.reauth) {
+        return;
+      }
+    }
+  }
+
+  // Authenticate with GitHub using PAT
+  const githubCredentials = await githubAuthUtils.authenticate();
+
+  if (!githubCredentials) {
+    logger.error("GitHub authentication failed or was cancelled.");
+  }
 }
 
 /**
