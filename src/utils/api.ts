@@ -312,7 +312,7 @@ export const apiUtils = {
         data.filesToUpdate.length > 0
       ) {
         logger.info(
-          `\nFound ${data.filesToUpdate.length} file(s) to update from filesToUpdate field...\n`
+          `Found ${data.filesToUpdate.length} file(s) to update from filesToUpdate field...\n`
         );
 
         for (const fileSpec of data.filesToUpdate) {

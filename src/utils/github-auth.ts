@@ -71,7 +71,7 @@ const getEncryptionPassword = (): string => {
     .digest("hex");
 };
 
-interface GitHubCredentials {
+export interface GitHubCredentials {
   username: string;
   accessToken: string;
 }

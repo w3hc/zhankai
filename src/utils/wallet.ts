@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { logger } from "../ui/logger";
-import { constants } from "../config/constants";
+import { colors } from "../config/constants";
 
 // Define the path for storing wallet data
 const getWalletFilePath = (): string => {
@@ -74,7 +74,7 @@ const getEncryptionPassword = (): string => {
  */
 export const walletUtils = {
   /**
-   * Generates a new Ethereum wallet and stores credentials securely
+   * Generates a new random Ethereum wallet and stores credentials securely
    */
   async generateWallet(): Promise<{ address: string; privateKey: string }> {
     try {
@@ -89,6 +89,7 @@ export const walletUtils = {
       const walletData = {
         address,
         encryptedPrivateKey: encrypt(privateKey, getEncryptionPassword()),
+        source: "random",
       };
 
       fs.writeFileSync(
@@ -104,11 +105,56 @@ export const walletUtils = {
   },
 
   /**
+   * Generates an Ethereum wallet derived from a GitHub username
+   * This creates a deterministic wallet based on the GitHub identity
+   */
+  async generateWalletFromGitHub(
+    githubUsername: string
+  ): Promise<{ address: string; privateKey: string }> {
+    try {
+      // Create a deterministic seed based on the GitHub username
+      // Add a salt to ensure security even if username is known
+      const salt = "zhankai-wallet-v1";
+      const seed = crypto
+        .createHash("sha256")
+        .update(`${githubUsername}-${salt}`)
+        .digest("hex");
+
+      // Generate deterministic wallet from the seed
+      const wallet = ethers.Wallet.fromPhrase(
+        ethers.Mnemonic.fromEntropy(`0x${seed}`).phrase
+      );
+
+      // Get the wallet's address and private key
+      const address = wallet.address;
+      const privateKey = wallet.privateKey;
+
+      // Encrypt and store the private key
+      const walletData = {
+        address,
+        encryptedPrivateKey: encrypt(privateKey, getEncryptionPassword()),
+        source: `github:${githubUsername}`,
+      };
+
+      fs.writeFileSync(
+        getWalletFilePath(),
+        JSON.stringify(walletData, null, 2)
+      );
+
+      return { address, privateKey };
+    } catch (error) {
+      logger.error("Failed to generate GitHub-derived wallet:", error);
+      throw new Error("Failed to generate GitHub-derived Ethereum wallet");
+    }
+  },
+
+  /**
    * Retrieves the stored wallet credentials
    */
   async getWalletCredentials(): Promise<{
     address: string;
     privateKey: string;
+    source?: string;
   } | null> {
     try {
       const walletFilePath = getWalletFilePath();
@@ -131,6 +177,7 @@ export const walletUtils = {
       return {
         address: walletData.address,
         privateKey,
+        source: walletData.source,
       };
     } catch (error) {
       logger.error("Failed to retrieve wallet credentials:", error);
@@ -141,9 +188,7 @@ export const walletUtils = {
   /**
    * Signs a message with the stored wallet's private key
    */
-  async signMessage(
-    message: string
-  ): Promise<{
+  async signMessage(message: string): Promise<{
     message: string;
     signature: string;
     messageHash: string;

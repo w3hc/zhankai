@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import prompts from "prompts";
 import { ZhankaiConfig } from "./utils/types";
+import { GitHubCredentials } from "./utils/github-auth";
 import { gitUtils } from "./utils/git";
 import { fileUtils } from "./utils/file";
 import { markdownUtils } from "./utils/markdown";
@@ -54,59 +55,67 @@ async function main() {
   program
     .command("login")
     .description(
-      "Generate an Ethereum wallet and authenticate with GitHub via OAuth"
+      "Authenticate with GitHub and generate an Ethereum wallet derived from your GitHub identity"
     )
-    .option("--skip-github", "Skip GitHub OAuth authentication", false)
-    .action(async (options) => {
+    .action(async () => {
       try {
         // First check GitHub authentication via Git (basic check)
         await githubUtils.checkGitHubAuth();
+
+        // Always authenticate with GitHub first
+        logger.info(
+          "GitHub authentication is required to generate your wallet"
+        );
+        const githubCredentials = await handleGitHubAuth();
+
+        if (!githubCredentials) {
+          logger.error("GitHub authentication is required to proceed");
+          return;
+        }
 
         // Check if wallet already exists
         const walletExists = await walletUtils.walletExists();
 
         if (walletExists) {
-          const credentials = await walletUtils.getWalletCredentials();
-          if (credentials) {
+          const existingWallet = await walletUtils.getWalletCredentials();
+          if (existingWallet) {
             logger.info(
-              `Ethereum wallet already exists: ${credentials.address}`
+              `Ethereum wallet already exists: ${existingWallet.address}`
             );
 
-            // Ask if user wants to generate a new wallet
+            // Ask if user wants to regenerate wallet from GitHub identity
             const response = await prompts({
               type: "confirm",
-              name: "generateNew",
+              name: "regenerate",
               message:
-                "Do you want to generate a new wallet? (This will overwrite the existing one)",
+                "Do you want to regenerate your wallet from your GitHub identity? (This will overwrite the existing one)",
               initial: false,
             });
 
-            if (!response.generateNew) {
-              // Skip to GitHub auth if user doesn't want a new wallet
-              if (!options.skipGithub) {
-                await handleGitHubAuth();
-              }
+            if (!response.regenerate) {
               return;
             }
           }
         }
 
-        // Generate a new wallet
-        logger.info("Generating a new Ethereum wallet...");
-        const wallet = await walletUtils.generateWallet();
+        // Generate a wallet derived from GitHub username
+        logger.info(
+          `Generating Ethereum wallet derived from GitHub identity: ${githubCredentials.username}`
+        );
+        const wallet = await walletUtils.generateWalletFromGitHub(
+          githubCredentials.username
+        );
 
         logger.info(
           `${colors.FG_GREEN}✓ Wallet generated successfully!${colors.RESET}`
         );
         logger.info(`${colors.BOLD}Address:${colors.RESET} ${wallet.address}`);
         logger.info(
+          `${colors.BOLD}Source:${colors.RESET} Derived from GitHub username: ${githubCredentials.username}`
+        );
+        logger.info(
           `${colors.FG_YELLOW}Important: Your wallet private key is stored securely in your home directory.${colors.RESET}`
         );
-
-        // After wallet creation, proceed with GitHub OAuth (unless skipped)
-        if (!options.skipGithub) {
-          await handleGitHubAuth();
-        }
       } catch (error) {
         logger.error("Failed during login:", error);
       }
@@ -117,7 +126,12 @@ async function main() {
     .description("Authenticate with GitHub using Personal Access Token")
     .action(async () => {
       try {
-        await handleGitHubAuth();
+        const credentials = await handleGitHubAuth();
+        if (credentials) {
+          logger.info(
+            `${colors.FG_GREEN}✓ Successfully authenticated as GitHub user: ${colors.BOLD}${credentials.username}${colors.RESET}`
+          );
+        }
       } catch (error) {
         logger.error("Failed during GitHub authentication:", error);
       }
@@ -169,8 +183,9 @@ async function main() {
 
 /**
  * Handle GitHub authentication using personal access token
+ * @returns GitHub credentials if authentication successful, null otherwise
  */
-async function handleGitHubAuth(): Promise<void> {
+async function handleGitHubAuth(): Promise<GitHubCredentials | null> {
   // Check if already authenticated
   const isAuthenticated = await githubAuthUtils.isAuthenticated();
 
@@ -190,7 +205,7 @@ async function handleGitHubAuth(): Promise<void> {
       });
 
       if (!response.reauth) {
-        return;
+        return credentials;
       }
     }
   }
@@ -200,7 +215,10 @@ async function handleGitHubAuth(): Promise<void> {
 
   if (!githubCredentials) {
     logger.error("GitHub authentication failed or was cancelled.");
+    return null;
   }
+
+  return githubCredentials;
 }
 
 /**
@@ -240,6 +258,9 @@ async function runZhankai(options: any) {
   if (config.query) {
     await handleQuery(config);
   }
+  
+  // Add a console.log saying yo
+  console.log("yo");
 }
 
 /**
