@@ -5,7 +5,7 @@
 
 A CLI tool that exports repository content into structured markdown for LLM processing.
 
-Zhankai utilizes the Rukh API to connect with Anthropic's [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet) model.
+Zhankai utilizes the [Rukh API](https://rukh.w3hc.org/) to connect with Anthropic's [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet) model.
 
 ## Features
 
@@ -26,6 +26,16 @@ npm install -g zhankai
 yarn global add zhankai
 # or
 pnpm add -g zhankai
+```
+
+## Upgrade
+
+```bash
+npm install -g zhankai@latest
+# or
+yarn global add zhankai@latest
+# or
+pnpm add -g zhankai@latest
 ```
 
 ## Usage
@@ -60,6 +70,12 @@ zhankai -q "Implement error handling for the authentication flow"
 | `-c, --contents` | Include file contents | `false` |
 | `-q, --query <string>` | AI query to Claude 3.7 Sonnet | - |
 | `--version` | Display version information | - |
+| `--debug` | Enable debug mode | `false` |
+| `--timeout <number>` | API request timeout in milliseconds | `240000` |
+| `login` | Authenticate with GitHub and generate Ethereum wallet | - |
+| `github` | Authenticate with GitHub using Personal Access Token | - |
+| `logout` | Clear stored GitHub credentials | - |
+| `sign <message>` | Sign a message with your Ethereum wallet | - |
 
 ## File Organization
 
@@ -69,6 +85,8 @@ Zhankai:
 - Adds `/zhankai` to your .gitignore automatically
 
 ## Development
+
+Please review the [contribution guidelines](CONTRIBUTING.md) before submitting pull requests.
 
 ### Setup
 
@@ -86,10 +104,6 @@ pnpm test
 pnpm test:watch     # Watch mode
 pnpm test:coverage  # Coverage report
 ```
-
-## Contributing
-
-Please review the [contribution guidelines](CONTRIBUTING.md) before submitting pull requests.
 
 ## Support
 
