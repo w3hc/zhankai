@@ -5,7 +5,7 @@
 
 A CLI tool that exports repository content into structured markdown for LLM processing.
 
-Zhankai utilizes the Rukh API to connect with Anthropic's [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet) model.
+Zhankai utilizes the [Rukh API](https://rukh.w3hc.org/) to connect with Anthropic's [`claude-3-7-sonnet-20250219`](https://www.anthropic.com/news/claude-3-7-sonnet) model.
 
 ## Features
 
