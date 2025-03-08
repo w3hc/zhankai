@@ -258,9 +258,6 @@ async function runZhankai(options: any) {
   if (config.query) {
     await handleQuery(config);
   }
-  
-  // Add a console.log saying yo
-  console.log("yo");
 }
 
 /**
