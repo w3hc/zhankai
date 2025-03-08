@@ -56,3 +56,28 @@ export interface FileToUpdate {
   /** New content for the file */
   fileContent: string;
 }
+
+/**
+ * Ethereum wallet credentials
+ */
+export interface WalletCredentials {
+  /** Ethereum address */
+  address: string;
+
+  /** Wallet private key */
+  privateKey: string;
+}
+
+/**
+ * Result of a message signing operation
+ */
+export interface SignMessageResult {
+  /** The original message */
+  message: string;
+
+  /** The generated signature */
+  signature: string;
+
+  /** The hash of the message */
+  messageHash: string;
+}

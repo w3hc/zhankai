@@ -11,7 +11,9 @@ import { markdownUtils } from "./utils/markdown";
 import { apiUtils } from "./utils/api";
 import { logger } from "./ui/logger";
 import { constants } from "./config/constants";
+import { colors } from "./config/constants";
 import { githubUtils } from "./utils/github";
+import { walletUtils } from "./utils/wallet";
 
 const packageJsonPath = path.join(__dirname, "..", "package.json");
 const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
@@ -50,9 +52,80 @@ async function main() {
 
   program
     .command("login")
-    .description("Check if you are authenticated with GitHub via Git")
+    .description(
+      "Generate an Ethereum wallet and authenticate with GitHub via Git"
+    )
     .action(async () => {
-      await githubUtils.checkGitHubAuth();
+      try {
+        // First check GitHub authentication
+        await githubUtils.checkGitHubAuth();
+
+        // Check if wallet already exists
+        const walletExists = await walletUtils.walletExists();
+
+        if (walletExists) {
+          const credentials = await walletUtils.getWalletCredentials();
+          if (credentials) {
+            logger.info(
+              `Ethereum wallet already exists: ${credentials.address}`
+            );
+
+            // Ask if user wants to generate a new wallet
+            const response = await prompts({
+              type: "confirm",
+              name: "generateNew",
+              message:
+                "Do you want to generate a new wallet? (This will overwrite the existing one)",
+              initial: false,
+            });
+
+            if (!response.generateNew) {
+              return;
+            }
+          }
+        }
+
+        // Generate a new wallet
+        logger.info("Generating a new Ethereum wallet...");
+        const wallet = await walletUtils.generateWallet();
+
+        logger.info(
+          `${colors.FG_GREEN}✓ Wallet generated successfully!${colors.RESET}`
+        );
+        logger.info(`${colors.BOLD}Address:${colors.RESET} ${wallet.address}`);
+        logger.info(
+          `${colors.FG_YELLOW}Important: Your wallet private key is stored securely in your home directory.${colors.RESET}`
+        );
+      } catch (error) {
+        logger.error("Failed during login:", error);
+      }
+    });
+
+  program
+    .command("sign")
+    .description("Sign a message with your Ethereum wallet")
+    .argument("<message>", "message to sign")
+    .action(async (message) => {
+      try {
+        const result = await walletUtils.signMessage(message);
+
+        if (!result) {
+          logger.error(
+            "Failed to sign message. No wallet found. Please run 'zhankai login' first."
+          );
+          return;
+        }
+
+        logger.info(`${colors.BOLD}Message:${colors.RESET} ${result.message}`);
+        logger.info(
+          `${colors.BOLD}Message Hash:${colors.RESET} ${result.messageHash}`
+        );
+        logger.info(
+          `${colors.BOLD}Signature:${colors.RESET} ${result.signature}`
+        );
+      } catch (error) {
+        logger.error("Failed to sign message:", error);
+      }
     });
 
   program.parse(process.argv);
