@@ -207,9 +207,11 @@ export const apiUtils = {
       while (attemptCount < constants.MAX_RETRIES) {
         try {
           loader.updateMessage(
-            `Sending request to ${constants.RUKH_API_URL} (attempt ${
-              attemptCount + 1
-            }/${constants.MAX_RETRIES})`
+            `Sending request to ${constants.RUKH_API_URL}${
+              attemptCount > 0
+                ? ` (attempt ${attemptCount + 1}/${constants.MAX_RETRIES})`
+                : ""
+            }`
           );
 
           // Create abort controller for timeout
@@ -242,7 +244,9 @@ export const apiUtils = {
             loader.updateMessage(
               `Rate limit hit. Retrying in ${
                 constants.RETRY_DELAY / 1000
-              } seconds...`
+              } seconds... (attempt ${attemptCount + 1}/${
+                constants.MAX_RETRIES
+              })`
             );
             await new Promise((resolve) =>
               setTimeout(resolve, constants.RETRY_DELAY)
