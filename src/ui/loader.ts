@@ -68,14 +68,7 @@ export class TerminalLoader {
     readline.clearLine(process.stdout, 0);
     readline.cursorTo(process.stdout, 0);
 
-    if (completionMessage) {
-      process.stdout.write(`${completionMessage}\n`);
-    }
-
-    // Add an extra newline to ensure separation from the next log message
-    process.stdout.write("\n");
-
-    process.stdout.write("\x1B[?25h"); // Show cursor
+    process.stdout.write("\x1B[?25h");
     this.isActive = false;
   }
 }
