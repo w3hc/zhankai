@@ -186,6 +186,19 @@ export const walletUtils = {
   },
 
   /**
+   * Gets just the wallet address without the private key
+   */
+  async getWalletAddress(): Promise<string> {
+    try {
+      const credentials = await this.getWalletCredentials();
+      return credentials ? credentials.address : "";
+    } catch (error) {
+      logger.error("Failed to get wallet address:", error);
+      return "";
+    }
+  },
+
+  /**
    * Signs a message with the stored wallet's private key
    */
   async signMessage(message: string): Promise<{

@@ -116,6 +116,17 @@ async function main() {
         logger.info(
           `${colors.FG_YELLOW}Important: Your wallet private key is stored securely in your home directory.${colors.RESET}`
         );
+
+        // Inform user about Rukh authentication
+        logger.info(
+          `${colors.FG_GREEN}✓ You can now use the -q option with Rukh authentication!${colors.RESET}`
+        );
+        logger.info(
+          `This wallet will be used to authenticate with the Rukh API when you use 'zhankai -q'`
+        );
+        logger.info(
+          `${colors.FG_YELLOW}Note: Premium features may require sponsoring the W3HC organization on GitHub.${colors.RESET}`
+        );
       } catch (error) {
         logger.error("Failed during login:", error);
       }
@@ -240,6 +251,12 @@ async function runZhankai(options: any) {
       : constants.DEFAULT_TIMEOUT_MS,
   };
 
+  // Enable debug mode if specified
+  if (config.debug) {
+    logger.enableDebugMode();
+    logger.debug("Debug mode enabled");
+  }
+
   // Setup output directory
   const zhankaiDir = await setupOutputDirectory(baseDir);
 
@@ -338,6 +355,38 @@ async function handleQuery(config: ZhankaiConfig): Promise<void> {
       logger.info("Operation cancelled. Please commit your changes first.");
       return;
     }
+  }
+
+  // Check for GitHub authentication
+  const isAuthenticated = await githubAuthUtils.isAuthenticated();
+  const walletExists = await walletUtils.walletExists();
+
+  if (!isAuthenticated || !walletExists) {
+    logger.warn(
+      "You are not authenticated with GitHub or don't have a wallet."
+    );
+    logger.warn("Some features might be restricted.");
+    logger.warn("To authenticate and create a wallet, run: zhankai login");
+
+    // Ask if user wants to continue without authentication
+    const response = await prompts({
+      type: "confirm",
+      name: "continue",
+      message: "Do you want to continue without authentication?",
+      initial: true,
+    });
+
+    if (!response.continue) {
+      logger.info("Operation cancelled. Please run 'zhankai login' first.");
+      return;
+    }
+  } else {
+    const githubCredentials = await githubAuthUtils.getGitHubCredentials();
+    const walletAddress = await walletUtils.getWalletAddress();
+
+    logger.info(`Using GitHub identity: ${githubCredentials?.username}`);
+    logger.info(`Using wallet address: ${walletAddress}`);
+    logger.info("Authentication enabled for Rukh API");
   }
 
   // Send query to Rukh API
