@@ -236,7 +236,7 @@ export const apiUtils = {
           // Handle specific error responses
           if (response.status === 401) {
             throw new Error(
-              "Authentication failed. Please check your API credentials."
+              "Authentication failed. Please activate sponsorship to W3HC at https://github.com/sponsors/w3hc"
             );
           }
 
@@ -418,9 +418,12 @@ export const apiUtils = {
         markdownUtils.formatMarkdownForTerminal(responseContent);
 
       // Process the API response if it contains file specifications
-      await this.processResponseForFileUpdates(data);
+      const processResponsePromise = this.processResponseForFileUpdates(data);
+
+      await processResponsePromise;
 
       loader.stop();
+
       // Return the formatted response
       return formattedResponse;
     } catch (error) {
