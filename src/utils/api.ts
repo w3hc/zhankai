@@ -408,7 +408,7 @@ export const apiUtils = {
     // Write the file
     try {
       writeFileSync(filePath, fileSpec.fileContent);
-      logger.info(`- Created/Updated file: ${fileSpec.fileName}`);
+      logger.info(`Created/Updated file: ${fileSpec.fileName}`);
     } catch (error) {
       logger.error(
         `❌ Error creating/updating file ${fileSpec.fileName}:`,
