@@ -1,6 +1,6 @@
 {
   "name": "zhankai",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "CLI tool for exporting repository content into a structured markdown file for LLM processing",
   "main": "dist/index.js",
   "bin": {
