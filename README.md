@@ -55,11 +55,14 @@ zhankai -o custom-docs.md
 
 ### AI Query
 
-> ⚠️ **Important:** Commit changes before using the `-q` option. Zhankai modifies code files when responding to queries.
+> [!TIPS]
+> Commit changes before using the `-q` option. Zhankai modifies code files when responding to queries.
 
 ```bash
-zhankai -q "Implement error handling for the authentication flow"
+zhankai -q "Add some magic to this app"
 ```
+
+Like it? [Sponsor W3HC](https://github.com/sponsors/w3hc) to support development and gain unlimited access to [Claude 3.7 Sonnet](https://www.anthropic.com/news/claude-3-7-sonnet) – it's the cheapest access available in town.
 
 ## Options
 
@@ -108,11 +111,16 @@ pnpm test:coverage  # Coverage report
 ## Support
 
 Contact [Julien](https://github.com/julienbrg) via:
+
 - Element: [@julienbrg:matrix.org](https://matrix.to/#/@julienbrg:matrix.org)
 - Farcaster: [julien-](https://warpcast.com/julien-)
 - Telegram: [@julienbrg](https://t.me/julienbrg)
 - Twitter: [@julienbrg](https://twitter.com/julienbrg)
+- Discord: [julienbrg](https://discordapp.com/users/julienbrg)
+- LinkedIn: [julienberanger](https://www.linkedin.com/in/julienberanger/)
 
 ## License
 
 [GPL-3.0](LICENSE)
+
+<img src="https://bafkreid5xwxz4bed67bxb2wjmwsec4uhlcjviwy7pkzwoyu5oesjd3sp64.ipfs.w3s.link" alt="built-with-ethereum-w3hc" width="100"/>

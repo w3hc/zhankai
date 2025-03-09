@@ -64,14 +64,11 @@ export class TerminalLoader {
       this.interval = null;
     }
 
+    // Ensure the line is completely cleared
     readline.clearLine(process.stdout, 0);
     readline.cursorTo(process.stdout, 0);
 
-    if (completionMessage) {
-      process.stdout.write(`${completionMessage}\n`);
-    }
-
-    process.stdout.write("\x1B[?25h"); // Show cursor
+    process.stdout.write("\x1B[?25h");
     this.isActive = false;
   }
 }

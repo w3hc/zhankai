@@ -7,11 +7,99 @@ import { fileUtils } from "./file";
 import { markdownUtils } from "./markdown";
 import { TerminalLoader } from "../ui/loader";
 import { RukhResponse, FileToUpdate } from "./types";
+import { walletUtils } from "./wallet";
+import { githubAuthUtils } from "./github-auth";
 
 /**
  * API utilities namespace
  */
 export const apiUtils = {
+  /**
+   * Fetches a SIWE challenge from Rukh API
+   */
+  async fetchSiweChallenge(): Promise<{
+    message: string;
+    nonce: string;
+  } | null> {
+    try {
+      const loader = new TerminalLoader(
+        "Fetching authentication challenge from Rukh API"
+      );
+      loader.start();
+
+      const response = await fetch(
+        `${constants.RUKH_API_URL.replace("/ask", "")}/siwe/challenge`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+          },
+        }
+      );
+
+      loader.stop();
+
+      if (!response.ok) {
+        logger.error(
+          `Failed to fetch SIWE challenge: ${response.status} ${response.statusText}`
+        );
+        return null;
+      }
+
+      const data = await response.json();
+      logger.debug("Received SIWE challenge:", data);
+      return data;
+    } catch (error) {
+      logger.error("Error fetching SIWE challenge:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Signs a message using the GitHub-derived wallet
+   */
+  async signChallengeWithGithubWallet(message: string): Promise<{
+    signature: string;
+    address: string;
+    githubUsername: string;
+  } | null> {
+    try {
+      // Get GitHub credentials
+      const githubCredentials = await githubAuthUtils.getGitHubCredentials();
+      if (!githubCredentials) {
+        logger.error(
+          "No GitHub credentials found. Please run 'zhankai login' first."
+        );
+        return null;
+      }
+
+      // Get wallet credentials
+      const walletCredentials = await walletUtils.getWalletCredentials();
+      if (!walletCredentials) {
+        logger.error(
+          "No wallet credentials found. Please run 'zhankai login' first."
+        );
+        return null;
+      }
+
+      // Sign the message
+      const signResult = await walletUtils.signMessage(message);
+      if (!signResult) {
+        logger.error("Failed to sign message");
+        return null;
+      }
+
+      return {
+        signature: signResult.signature,
+        address: walletCredentials.address,
+        githubUsername: githubCredentials.username,
+      };
+    } catch (error) {
+      logger.error("Error signing challenge:", error);
+      return null;
+    }
+  },
+
   /**
    * Sends a query to the Rukh API and handles the response
    */
@@ -40,13 +128,54 @@ export const apiUtils = {
         );
       }
 
+      // Get SIWE authentication data
+      let authData = null;
+      try {
+        // Fetch challenge
+        const challenge = await this.fetchSiweChallenge();
+        if (!challenge) {
+          logger.warn(
+            "Failed to get authentication challenge, proceeding without authentication"
+          );
+        } else {
+          // Sign challenge
+          const signatureData = await this.signChallengeWithGithubWallet(
+            challenge.message
+          );
+          if (signatureData) {
+            authData = {
+              githubUserName: signatureData.githubUsername,
+              nonce: challenge.nonce,
+              signature: signatureData.signature,
+            };
+            logger.info(
+              `Authenticated as GitHub user: ${signatureData.githubUsername}`
+            );
+            logger.debug("Auth data:", authData);
+          }
+        }
+      } catch (authError) {
+        logger.warn(
+          "Authentication error, proceeding without authentication:",
+          authError
+        );
+      }
+
       // Prepare form data
       const formData = new FormData();
       formData.append("message", query);
       formData.append("model", "anthropic");
       formData.append("sessionId", "");
-      formData.append("walletAddress", "");
+      formData.append(
+        "walletAddress",
+        authData ? await walletUtils.getWalletAddress() : ""
+      );
       formData.append("context", "zhankai");
+
+      // Add auth data if available
+      if (authData) {
+        formData.append("data", JSON.stringify(authData));
+      }
 
       const fileName = path.basename(filePath);
 
@@ -78,9 +207,11 @@ export const apiUtils = {
       while (attemptCount < constants.MAX_RETRIES) {
         try {
           loader.updateMessage(
-            `Sending request to ${constants.RUKH_API_URL} (attempt ${
-              attemptCount + 1
-            }/${constants.MAX_RETRIES})`
+            `Sending request to ${constants.RUKH_API_URL}${
+              attemptCount > 0
+                ? ` (attempt ${attemptCount + 1}/${constants.MAX_RETRIES})`
+                : ""
+            }`
           );
 
           // Create abort controller for timeout
@@ -105,7 +236,7 @@ export const apiUtils = {
           // Handle specific error responses
           if (response.status === 401) {
             throw new Error(
-              "Authentication failed. Please check your API credentials."
+              "Authentication failed. Please activate sponsorship to W3HC at https://github.com/sponsors/w3hc"
             );
           }
 
@@ -113,7 +244,9 @@ export const apiUtils = {
             loader.updateMessage(
               `Rate limit hit. Retrying in ${
                 constants.RETRY_DELAY / 1000
-              } seconds...`
+              } seconds... (attempt ${attemptCount + 1}/${
+                constants.MAX_RETRIES
+              })`
             );
             await new Promise((resolve) =>
               setTimeout(resolve, constants.RETRY_DELAY)
@@ -285,9 +418,12 @@ export const apiUtils = {
         markdownUtils.formatMarkdownForTerminal(responseContent);
 
       // Process the API response if it contains file specifications
-      await this.processResponseForFileUpdates(data);
+      const processResponsePromise = this.processResponseForFileUpdates(data);
+
+      await processResponsePromise;
 
       loader.stop();
+
       // Return the formatted response
       return formattedResponse;
     } catch (error) {
@@ -408,7 +544,7 @@ export const apiUtils = {
     // Write the file
     try {
       writeFileSync(filePath, fileSpec.fileContent);
-      logger.info(`- Created/Updated file: ${fileSpec.fileName}`);
+      logger.info(`Created/Updated file: ${fileSpec.fileName}`);
     } catch (error) {
       logger.error(
         `❌ Error creating/updating file ${fileSpec.fileName}:`,

@@ -81,3 +81,28 @@ export interface SignMessageResult {
   /** The hash of the message */
   messageHash: string;
 }
+
+/**
+ * Authentication data for Rukh API
+ */
+export interface RukhAuthData {
+  /** GitHub username */
+  githubUserName: string;
+
+  /** Nonce from the SIWE challenge */
+  nonce: string;
+
+  /** Signature of the SIWE challenge message */
+  signature: string;
+}
+
+/**
+ * SIWE challenge response from Rukh API
+ */
+export interface SiweChallenge {
+  /** Challenge message to sign */
+  message: string;
+
+  /** Nonce to include in verification */
+  nonce: string;
+}
