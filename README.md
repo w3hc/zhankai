@@ -55,7 +55,7 @@ zhankai -o custom-docs.md
 
 ### AI Query
 
-> [!TIPS]
+> [!TIP]
 > Commit changes before using the `-q` option. Zhankai modifies code files when responding to queries.
 
 ```bash
