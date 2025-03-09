@@ -59,7 +59,7 @@ zhankai -o custom-docs.md
 > Commit changes before using the `-q` option. Zhankai modifies code files when responding to queries.
 
 ```bash
-zhankai -q "Add some magic to this app"
+zhankai -q "Add a workflow file that describes how the app work in detail"
 ```
 
 Like it? [Sponsor W3HC](https://github.com/sponsors/w3hc) to support development and gain unlimited access to [Claude 3.7 Sonnet](https://www.anthropic.com/news/claude-3-7-sonnet) – it's the cheapest access available in town.
